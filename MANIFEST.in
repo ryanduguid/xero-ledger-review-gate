@@ -1,5 +1,5 @@
 include LICENSE
 include README.md
 include SECURITY.md
-recursive-include policy *.json
-recursive-include samples *.csv *.json
+recursive-include xero_ai_review_gateway/policy *.json
+recursive-include xero_ai_review_gateway/samples *.csv *.json

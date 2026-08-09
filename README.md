@@ -33,11 +33,11 @@ xero-ai-review-gateway evaluate \
   --out build/demo
 ```
 
-The command writes three deterministic files below `build/demo`:
+The command works from any directory: the relative `samples/` and `policy/` paths resolve against the data bundled inside the installed package, and outputs land below `build/` in the directory you run it from. It writes three deterministic files below `build/demo`:
 
 - `model-result.json`: the only artefact a future AI adapter may receive. It has redacted account references and bounded values only.
 - `reviewer-evidence.json`: fabricated display evidence for a human reviewer. In a real system this would need its own access controls.
-- `receipt.json`: source, policy, request, and result hashes that make the run reproducible.
+- `receipt.json`: source, policy, request, result, and evidence hashes that make the run reproducible and let `validate-review` detect a tampered evidence file.
 
 The sole supported request is `trial_balance_variance` for an explicitly allowlisted section. It cannot select columns, change thresholds, use a natural-language prompt, choose a file path, or invoke an arbitrary Xero/MCP tool.
 
@@ -45,16 +45,17 @@ The sole supported request is `trial_balance_variance` for an explicitly allowli
 xero-ai-review-gateway validate-review \
   --evidence build/demo/reviewer-evidence.json \
   --receipt build/demo/receipt.json \
-  --decision path/to/a-human-decision.json
+  --decision samples/decisions/sample-review-decision.json
 ```
 
-The decision validator accepts only `ACKNOWLEDGED`, `NEEDS_EVIDENCE`, or `ESCALATED`. It records no accounting action and rejects `APPROVED`, `RESOLVED`, `POSTED`, `PAID`, `LODGED`, and `LOCKED`.
+`--decision` accepts a file from the bundled `samples/` data or from `build/` under the working directory, so a real decision can sit next to the run outputs it refers to. The decision validator accepts only `ACKNOWLEDGED`, `NEEDS_EVIDENCE`, or `ESCALATED`. It records no accounting action and rejects `APPROVED`, `RESOLVED`, `POSTED`, `PAID`, `LODGED`, and `LOCKED`.
 
 ## Control boundary
 
 - The canonical source contract has exactly ten columns: `ReportDate,Tenant,Section,AccountID,AccountName,AccountCode,Debit,Credit,YTDDebit,YTDCredit`.
 - CSV schema, duplicate account IDs, reporting dates, balance pairs, source hashes, entity, basis, currency, tracking filters, and draft setting are all checked before review.
 - Monetary values use `Decimal`, never binary floating point.
+- `percent_change` in the model result is expressed in percent and quantized to four decimal places (`"18.3333"` means 18.3333%). It is `null` when there is no prior balance to compare against.
 - Current/prior trial balances are joined by stable `AccountID`, not account display name or code.
 - The model result never contains a tenant name, account name, account code, source file path, token, raw error, or free text copied from source data.
 - The package contains no network imports or mutation adapter. A future live connection must remain an authorised, read-only export handoff—not an AI-controlled broad Xero tool set.
@@ -71,3 +72,5 @@ python -m build
 ```
 
 MIT licensed.
+
+Built with AI assistance (Claude); design, review, and testing by the author.

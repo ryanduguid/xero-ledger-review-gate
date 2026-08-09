@@ -2,14 +2,21 @@ from __future__ import annotations
 
 import hashlib
 import json
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
 from .errors import GatewayError
 
 
-def repository_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+def package_root() -> Path:
+    """The installed package directory that carries the bundled policy/ and samples/ data."""
+    return Path(str(resources.files(__package__)))
+
+
+def build_root() -> Path:
+    """Run outputs are anchored below build/ in the invoking working directory."""
+    return Path.cwd() / "build"
 
 
 def sha256_bytes(value: bytes) -> str:
@@ -33,6 +40,10 @@ def load_json_exact(path: Path, required: set[str], *, label: str) -> dict[str, 
         raw = json.loads(path.read_text(encoding="utf-8"))
     except FileNotFoundError as exc:
         raise GatewayError(f"{label} does not exist: {path}.") from exc
+    except UnicodeDecodeError as exc:
+        raise GatewayError(f"{label} is not valid UTF-8 text: {path}.") from exc
+    except OSError as exc:
+        raise GatewayError(f"{label} cannot be read: {path}.") from exc
     except json.JSONDecodeError as exc:
         raise GatewayError(f"{label} is not valid JSON: {path}.") from exc
     if not isinstance(raw, dict) or set(raw) != required:
@@ -51,7 +62,3 @@ def path_within(path: Path, parent: Path, *, label: str, require_exists: bool = 
     except ValueError as exc:
         raise GatewayError(f"{label} must stay within {root}.") from exc
     return resolved
-
-
-def safe_markdown(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("|", "\\|").replace("[", "\\[").replace("]", "\\]").replace("\n", " ").replace("\r", " ")

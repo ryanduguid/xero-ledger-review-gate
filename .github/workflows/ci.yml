@@ -1,0 +1,59 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.10", "3.11", "3.12", "3.13"]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install -e ".[dev]"
+      - run: pytest
+
+  package:
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m build
+      # policy/ and samples/ ship as package data; a wheel that drops them
+      # produces a console script that cannot run at all, so install the
+      # wheel into a clean venv and run the demo from an empty directory.
+      - name: install the wheel and run the demo from an empty directory
+        run: |
+          python -m venv /tmp/venv
+          # --no-index, or pip is free to resolve the name from PyPI and
+          # test a release nobody built in this job.
+          /tmp/venv/bin/pip install --no-index --find-links dist xero-ai-review-gateway
+          mkdir /tmp/demo
+          cd /tmp/demo
+          /tmp/venv/bin/xero-ai-review-gateway evaluate \
+            --context samples/contexts/sample-monthly-variance.context.json \
+            --request samples/requests/sample-revenue-variance.request.json \
+            --policy policy/demo-policy-v1.json \
+            --out build/demo
+          /tmp/venv/bin/xero-ai-review-gateway validate-review \
+            --evidence build/demo/reviewer-evidence.json \
+            --receipt build/demo/receipt.json \
+            --decision samples/decisions/sample-review-decision.json
+          test -f build/demo/receipt.json

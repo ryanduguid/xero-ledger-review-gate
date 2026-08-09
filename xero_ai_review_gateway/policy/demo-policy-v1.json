@@ -10,6 +10,7 @@
     }
   },
   "model_projection": [
+    "finding_id",
     "evidence_ref",
     "account_ref",
     "section",

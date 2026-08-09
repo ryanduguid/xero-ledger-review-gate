@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .errors import GatewayError
 from .gateway import evaluate, validate_review, write_evaluation
-from .util import path_within, repository_root
+from .util import build_root, path_within
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -21,7 +21,7 @@ def build_parser() -> argparse.ArgumentParser:
     decision_parser = commands.add_parser("validate-review", help="validate a human acknowledgement/escalation record")
     decision_parser.add_argument("--evidence", required=True, type=Path)
     decision_parser.add_argument("--receipt", required=True, type=Path)
-    decision_parser.add_argument("--decision", required=True, type=Path)
+    decision_parser.add_argument("--decision", required=True, type=Path, help="decision JSON under the bundled samples/ data or the working directory's build/")
     decision_parser.add_argument("--out", type=Path, help="optional JSON validation output below build/")
     return parser
 
@@ -38,10 +38,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         validation = validate_review(evidence_path=args.evidence, receipt_path=args.receipt, decision_path=args.decision)
         if args.out:
-            out = path_within(args.out, repository_root() / "build", label="validation output", require_exists=False)
+            out = path_within(args.out, build_root(), label="validation output", require_exists=False)
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(json.dumps(validation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        print(f"xero-ai-review-gateway: {validation['status']}; {validation['decision_count']} decision(s)")
+        print(f"xero-ai-review-gateway: {validation['status']}; {validation['decision_count']} decision(s); {validation['undecided_count']} undecided finding(s)")
         return 0
     except GatewayError as exc:
         print(f"xero-ai-review-gateway: blocked: {exc}", file=sys.stderr)
