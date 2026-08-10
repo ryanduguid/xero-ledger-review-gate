@@ -298,6 +298,33 @@ def test_one_sided_account_outside_the_requested_section_is_not_reported() -> No
     assert findings == []
 
 
+def test_a_movement_over_the_absolute_floor_but_under_the_percent_floor_is_not_reported() -> None:
+    """Both floors bound the reported set, so clearing one of them is not enough.
+
+    Every other variance test either clears both floors or has percent None,
+    the one-sided case where the percentage clause is skipped by design, so the
+    percentage half of the policy's bounded-results contract never ran.
+    """
+    # -61,500 against -60,000 is a 1,500 movement: over minimum_absolute_delta
+    # 1000.00, and 2.50% against a minimum_percent_delta of 15.00.
+    current = (_row("acct-1", ytd_credit="61500.00"),)
+    prior = (_row("acct-1", ytd_credit="60000.00"),)
+
+    assert _variance_findings(current, prior, entity_ref="entity-1", section="Revenue", operation=OPERATION) == []
+
+
+def test_a_movement_exactly_at_the_percent_floor_is_reported() -> None:
+    """The floor is a minimum, not a value to exceed, so 15.00% is inside the reported set."""
+    current = (_row("acct-1", ytd_credit="69000.00"),)
+    prior = (_row("acct-1", ytd_credit="60000.00"),)
+
+    findings = _variance_findings(current, prior, entity_ref="entity-1", section="Revenue", operation=OPERATION)
+
+    assert len(findings) == 1
+    assert findings[0][0]["delta"] == "-9000.00"
+    assert findings[0][0]["percent_change"] == "15.0000"
+
+
 def test_account_section_drift_fails_closed() -> None:
     current = (_row("acct-1", section="Assets", ytd_credit="18000.00"),)
     prior = (_row("acct-1", section="Revenue", ytd_credit="9000.00"),)
@@ -692,6 +719,27 @@ def test_a_review_artefact_not_marked_synthetic_is_refused(artefact: str, tmp_pa
         _validate(_resealed_run(tmp_path, **{f"{artefact}_edit": relabel}))
 
 
+@pytest.mark.parametrize("artefact", ["evidence", "receipt", "decision"])
+def test_a_run_id_that_disagrees_across_the_pack_is_refused(
+    artefact: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """This is the only line binding a human sign-off to the run it claims to be about.
+
+    Nothing else compares the three run_id values: the receipt digests seal the
+    evidence and the model result, not the decision. Without this check a
+    decision written for one run validates against another run's evidence and
+    receipt whenever the finding IDs coincide, and validate_review reports
+    DECISION_RECORDED for a run nobody signed off.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    def restamp(payload: dict) -> None:
+        payload["run_id"] = "sha256:some-other-run"
+
+    with pytest.raises(GatewayError, match="must refer to the same run_id"):
+        _validate(_resealed_run(tmp_path, **{f"{artefact}_edit": restamp}))
+
+
 def test_reviewer_evidence_carrying_one_finding_twice_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Two items sharing a finding_id make one decision look like two, or hide one of the pair."""
     monkeypatch.chdir(tmp_path)
@@ -732,6 +780,26 @@ def test_a_blank_or_control_character_reviewer_ref_is_refused(
         _validate(_resealed_run(tmp_path, decision_edit=rename))
 
 
+@pytest.mark.parametrize("rationale", ["reviewed\nACKNOWLEDGED by the reviewer", "reviewed\x7f"])
+def test_a_control_character_in_a_decision_rationale_is_refused(
+    rationale: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The rationale is reviewer free text written into a record, exactly like reviewer_ref.
+
+    The line above this one already refuses a non-string or blank rationale, so
+    the control-character branch is the whole of what this call still does.
+    Without it a rationale can carry a newline and forge a second line in any
+    log or report that prints the decision record.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    def rewrite(decision: dict) -> None:
+        decision["decisions"][0]["rationale"] = rationale
+
+    with pytest.raises(GatewayError, match="human decision rationale must not contain control characters"):
+        _validate(_resealed_run(tmp_path, decision_edit=rewrite))
+
+
 def test_a_decision_state_that_is_not_a_string_is_refused_not_a_type_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Without the isinstance guard the allowlist test raises TypeError: unhashable type."""
     monkeypatch.chdir(tmp_path)
@@ -741,6 +809,50 @@ def test_a_decision_state_that_is_not_a_string_is_refused_not_a_type_error(tmp_p
 
     with pytest.raises(GatewayError, match="decision state or rationale is invalid"):
         _validate(_resealed_run(tmp_path, decision_edit=listify))
+
+
+@pytest.mark.parametrize("decisions", [[], {}, "ACKNOWLEDGED", None])
+def test_a_decision_file_that_records_no_decision_is_refused(
+    decisions: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty decisions array is not a partial review; it is a file that decided nothing.
+
+    Without this gate an empty list reaches undecided_count == total_findings
+    and is reported as PARTIAL_DECISION_RECORDED, so a decision file recording
+    nothing at all becomes a valid review record instead of a blocked run.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    def replace(decision: dict) -> None:
+        decision["decisions"] = decisions
+
+    with pytest.raises(GatewayError, match="must contain at least one decision"):
+        _validate(_resealed_run(tmp_path, decision_edit=replace))
+
+
+@pytest.mark.parametrize("mangle", ["not-a-dict", "extra-field", "missing-field"])
+def test_malformed_human_decision_entries_are_blocked(
+    mangle: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The evidence items are checked this way; the decision entries need the same.
+
+    A non-dict entry reaches item["finding_id"] and raises TypeError instead of
+    a blocked run, and an entry carrying an extra field still has every key the
+    later lines read, so only the exact key-set comparison can refuse either.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    def mangle_entry(decision: dict) -> None:
+        entry = decision["decisions"][0]
+        if mangle == "not-a-dict":
+            decision["decisions"][0] = entry["finding_id"]
+        elif mangle == "extra-field":
+            decision["decisions"][0] = dict(entry, unexpected="extra")
+        else:
+            decision["decisions"][0] = {key: value for key, value in entry.items() if key != "rationale"}
+
+    with pytest.raises(GatewayError, match="Each human decision must contain exactly"):
+        _validate(_resealed_run(tmp_path, decision_edit=mangle_entry))
 
 
 def test_a_truncated_flag_that_contradicts_the_item_counts_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -948,6 +1060,37 @@ def test_the_scope_note_names_exactly_the_artefacts_that_carry_the_mode_marker(t
     readme = (Path(__file__).resolve().parents[1] / "README.md").read_text(encoding="utf-8")
     assert "Every source manifest, review context, model result, reviewer evidence, and receipt is marked `mode: synthetic`." in readme
     assert "The `validate-review` output carries no `mode` key either" in readme
+
+
+def test_the_three_artefacts_the_scope_note_exempts_reject_an_added_mode_key(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The scope note says adding a `mode` key to these three is rejected; this runs that rule.
+
+    The test above asserts the README sentence is present. Only the exact
+    key-set comparison in load_json_exact enforces it, and with that one line
+    disabled all three of these artefacts load and the run completes, so the
+    tie-out was pinning prose that nothing policed.
+    """
+    from xero_ai_review_gateway.gateway import _load_policy, _load_request
+
+    policy_path = tmp_path / "policy.json"
+    policy_source = json.loads((PKG / "policy" / "demo-policy-v1.json").read_text(encoding="utf-8"))
+    policy_path.write_text(json.dumps(dict(policy_source, mode="live")), encoding="utf-8")
+    with pytest.raises(GatewayError, match="policy must contain exactly: model_projection, operations, policy_id, schema_version"):
+        _load_policy(policy_path)
+
+    request_path = tmp_path / "request.json"
+    request_source = json.loads((PKG / "samples" / "requests" / "sample-revenue-variance.request.json").read_text(encoding="utf-8"))
+    request_path.write_text(json.dumps(dict(request_source, mode="live")), encoding="utf-8")
+    with pytest.raises(GatewayError, match="review request must contain exactly: operation, policy_id, request_id, schema_version, section"):
+        _load_request(request_path, _load_policy(PKG / "policy" / "demo-policy-v1.json"))
+
+    monkeypatch.chdir(tmp_path)
+
+    def mark_live(decision: dict) -> None:
+        decision["mode"] = "live"
+
+    with pytest.raises(GatewayError, match="human decision must contain exactly: decisions, reviewed_at, reviewer_ref, run_id, schema_version"):
+        _validate(_resealed_run(tmp_path, decision_edit=mark_live))
 
 
 def test_output_directory_occupied_by_a_file_is_blocked_not_a_traceback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
