@@ -422,7 +422,29 @@ def test_empty_report_date_is_reported_as_empty_not_bad_iso(tmp_path: Path) -> N
         _load_tb(bad)
 
 
-def test_malformed_evidence_items_are_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+EVIDENCE_ITEM = {
+    "finding_id": "x",
+    "account_id": "acct-1",
+    "account_code": "9999",
+    "account_name": "Name acct-1",
+    "current_values": None,
+    "prior_values": None,
+    "source_refs": ["source:current"],
+}
+
+
+@pytest.mark.parametrize(
+    "items",
+    [
+        ["not-a-dict"],
+        # A dict is not enough: an item carrying an extra field, or missing a
+        # declared one, still has the finding_id every later line reads, so
+        # only the exact key-set comparison can refuse either.
+        [dict(EVIDENCE_ITEM, unexpected="extra")],
+        [{key: value for key, value in EVIDENCE_ITEM.items() if key != "source_refs"}],
+    ],
+)
+def test_malformed_evidence_items_are_blocked(items: list, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from xero_ai_review_gateway.util import canonical_json, sha256_bytes
 
     monkeypatch.chdir(tmp_path)
@@ -432,7 +454,7 @@ def test_malformed_evidence_items_are_blocked(tmp_path: Path, monkeypatch: pytes
         "schema_version": "xero-reviewer-evidence.v1",
         "run_id": "sha256:unit-test",
         "mode": "synthetic",
-        "items": ["not-a-dict"],
+        "items": items,
         "total_findings": 1,
         "truncated": False,
     }
@@ -493,6 +515,31 @@ def test_exact_account_id_leaf_still_trips_the_disclosure_check() -> None:
         _assert_model_is_redacted(model, rows)
 
 
+@pytest.mark.parametrize("leaf", ["Unit Test Tenant", "Name acct-1", "9999"])
+def test_every_source_display_value_the_readme_names_is_forbidden_as_a_leaf(leaf: str) -> None:
+    """Tenant, account name and account code are the three values README "Control boundary" names.
+
+    AccountID has its own test above. The account code was reachable only as a
+    key name, so a code leaking into a model leaf under some future projection
+    would have passed the last-line defence that exists to catch exactly that.
+    """
+    rows = (_row("acct-1"),)
+    model = {"findings": [{"review_reason": leaf}]}
+
+    with pytest.raises(GatewayError, match="raw source display data"):
+        _assert_model_is_redacted(model, rows)
+
+
+@pytest.mark.parametrize("field", ["tenant", "account_name", "account_code"])
+def test_a_prohibited_source_field_name_trips_the_disclosure_check(field: str) -> None:
+    """The key-name branch catches a source field whose value no row happens to hold."""
+    rows = (_row("acct-1"),)
+    model = {"findings": [{field: "a value no row carries"}]}
+
+    with pytest.raises(GatewayError, match="prohibited source field"):
+        _assert_model_is_redacted(model, rows)
+
+
 def _decided_run(tmp_path: Path, state: str) -> tuple[dict[str, Path], Path]:
     """A completed run in tmp_path/build plus a decision file recording one state."""
     model, evidence, receipt = _evaluate()
@@ -538,6 +585,162 @@ def test_each_documented_review_state_is_recorded(state: str, tmp_path: Path, mo
     result = validate_review(evidence_path=paths["evidence"], receipt_path=paths["receipt"], decision_path=decision_path)
 
     assert result["status"] == "DECISION_RECORDED"
+
+
+def _resealed_run(
+    tmp_path: Path,
+    *,
+    evidence_edit=None,
+    receipt_edit=None,
+    decision_edit=None,
+) -> dict[str, Path]:
+    """A completed run whose artefacts are edited and then resealed against each other.
+
+    validate_review compares the receipt's evidence digest before every shape
+    gate, so an unsealed edit is refused by the digest check and proves nothing
+    about the gate a test names. Resealing takes the digest out of the picture
+    and leaves exactly one line able to refuse the pack, which is what makes
+    deleting that line turn the test red.
+    """
+    model, evidence, receipt = _evaluate()
+    paths = write_evaluation(model, evidence, receipt, Path("build") / "run")
+    evidence = json.loads(paths["evidence"].read_text(encoding="utf-8"))
+    receipt = json.loads(paths["receipt"].read_text(encoding="utf-8"))
+    decision = {
+        "schema_version": "xero-human-review-decision.v1",
+        "run_id": receipt["run_id"],
+        "reviewer_ref": "unit-test-reviewer",
+        "reviewed_at": "2026-08-09T00:00:00Z",
+        "decisions": [
+            {
+                "finding_id": evidence["items"][0]["finding_id"],
+                "decision": "ACKNOWLEDGED",
+                "rationale": "Fabricated demo variance reviewed.",
+            }
+        ],
+    }
+    for payload, edit in ((evidence, evidence_edit), (decision, decision_edit)):
+        if edit is not None:
+            edit(payload)
+    receipt["evidence_sha256"] = "sha256:" + sha256_bytes(canonical_json(evidence))
+    if receipt_edit is not None:
+        receipt_edit(receipt)
+    for key, payload in (("evidence", evidence), ("receipt", receipt)):
+        paths[key].write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    paths["decision"] = tmp_path / "build" / "run" / "decision.json"
+    paths["decision"].write_text(json.dumps(decision, indent=2) + "\n", encoding="utf-8")
+    return paths
+
+
+def _validate(paths: dict[str, Path]) -> dict:
+    return validate_review(evidence_path=paths["evidence"], receipt_path=paths["receipt"], decision_path=paths["decision"])
+
+
+def test_the_resealed_pack_helper_leaves_a_run_that_still_validates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """With no edit applied the pack must pass, or the refusals below prove nothing."""
+    monkeypatch.chdir(tmp_path)
+
+    assert _validate(_resealed_run(tmp_path))["status"] == "DECISION_RECORDED"
+
+
+def test_a_decision_naming_a_finding_the_evidence_does_not_carry_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """This is the binding between the human sign-off and the reviewer evidence.
+
+    Without it a fabricated finding_id counts toward the decided set, so
+    undecided_count reaches zero and validate_review reports DECISION_RECORDED
+    for a run whose real findings were never looked at.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    def fabricate(decision: dict) -> None:
+        decision["decisions"][0]["finding_id"] = "finding:never-emitted"
+
+    with pytest.raises(GatewayError, match="unknown or duplicate finding"):
+        _validate(_resealed_run(tmp_path, decision_edit=fabricate))
+
+
+def test_the_same_finding_decided_twice_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two contradictory decisions for one finding must not collapse into one recorded decision."""
+    monkeypatch.chdir(tmp_path)
+
+    def decide_twice(decision: dict) -> None:
+        decision["decisions"].append(dict(decision["decisions"][0], decision="ESCALATED", rationale="And again."))
+
+    with pytest.raises(GatewayError, match="unknown or duplicate finding"):
+        _validate(_resealed_run(tmp_path, decision_edit=decide_twice))
+
+
+def test_a_reviewed_at_without_an_offset_is_refused_through_validate_review(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The timestamp grammar has its own unit tests; this pins the call site that runs it."""
+    monkeypatch.chdir(tmp_path)
+
+    def strip_offset(decision: dict) -> None:
+        decision["reviewed_at"] = "2026-08-09T00:00:00"
+
+    with pytest.raises(GatewayError, match="explicit UTC offset"):
+        _validate(_resealed_run(tmp_path, decision_edit=strip_offset))
+
+
+@pytest.mark.parametrize("artefact", ["evidence", "receipt"])
+def test_a_review_artefact_not_marked_synthetic_is_refused(artefact: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    def relabel(payload: dict) -> None:
+        payload["mode"] = "live"
+
+    with pytest.raises(GatewayError, match="Only synthetic review artefacts"):
+        _validate(_resealed_run(tmp_path, **{f"{artefact}_edit": relabel}))
+
+
+def test_reviewer_evidence_carrying_one_finding_twice_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Two items sharing a finding_id make one decision look like two, or hide one of the pair."""
+    monkeypatch.chdir(tmp_path)
+
+    def duplicate(evidence: dict) -> None:
+        evidence["items"].append(dict(evidence["items"][0]))
+        evidence["total_findings"] = 2
+
+    with pytest.raises(GatewayError, match="duplicate finding IDs"):
+        _validate(_resealed_run(tmp_path, evidence_edit=duplicate))
+
+
+@pytest.mark.parametrize("value", [True, 0])
+def test_evidence_total_findings_that_is_boolean_or_below_the_item_count_is_refused(
+    value: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """total_findings drives undecided_count, so JSON true would close a review on its own."""
+    monkeypatch.chdir(tmp_path)
+
+    def retotal(evidence: dict) -> None:
+        evidence["total_findings"] = value
+
+    with pytest.raises(GatewayError, match="total_findings must be an integer at least as large"):
+        _validate(_resealed_run(tmp_path, evidence_edit=retotal))
+
+
+@pytest.mark.parametrize("reviewer_ref", ["", "   ", "demo\nreviewer"])
+def test_a_blank_or_control_character_reviewer_ref_is_refused(
+    reviewer_ref: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """reviewer_ref is the only record of who signed off, and a control character rewrites a log line."""
+    monkeypatch.chdir(tmp_path)
+
+    def rename(decision: dict) -> None:
+        decision["reviewer_ref"] = reviewer_ref
+
+    with pytest.raises(GatewayError, match="human decision reviewer_ref"):
+        _validate(_resealed_run(tmp_path, decision_edit=rename))
+
+
+def test_a_decision_state_that_is_not_a_string_is_refused_not_a_type_error(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without the isinstance guard the allowlist test raises TypeError: unhashable type."""
+    monkeypatch.chdir(tmp_path)
+
+    def listify(decision: dict) -> None:
+        decision["decisions"][0]["decision"] = ["ACKNOWLEDGED"]
+
+    with pytest.raises(GatewayError, match="decision state or rationale is invalid"):
+        _validate(_resealed_run(tmp_path, decision_edit=listify))
 
 
 def test_a_truncated_flag_that_contradicts_the_item_counts_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

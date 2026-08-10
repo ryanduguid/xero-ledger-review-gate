@@ -136,35 +136,45 @@ def _decimal(value: Any, *, field: str) -> Decimal:
 def _load_tb(path: Path) -> tuple[BalanceRow, ...]:
     rows: list[BalanceRow] = []
     seen: set[str] = set()
-    with path.open("r", encoding="utf-8-sig", newline="") as source:
-        reader = csv.DictReader(source)
-        if reader.fieldnames is None or tuple(reader.fieldnames) != CANONICAL_COLUMNS:
-            raise GatewayError("CSV must have exactly the canonical ten-column header in its declared order.")
-        for line, raw in enumerate(reader, start=2):
-            if None in raw:
-                raise GatewayError(f"CSV row {line} has more fields than its header.")
-            report_date_text = _non_empty(raw["ReportDate"], field=f"CSV row {line} ReportDate")
-            try:
-                report_date = date.fromisoformat(report_date_text)
-            except ValueError as exc:
-                raise GatewayError(f"CSV row {line} ReportDate must be ISO YYYY-MM-DD.") from exc
-            account_id = _non_empty(raw["AccountID"], field=f"CSV row {line} AccountID")
-            if account_id in seen:
-                raise GatewayError(f"CSV has duplicate AccountID {account_id!r}.")
-            seen.add(account_id)
-            row = BalanceRow(
-                report_date=report_date,
-                tenant=_non_empty(raw["Tenant"], field=f"CSV row {line} Tenant"),
-                section=_non_empty(raw["Section"], field=f"CSV row {line} Section"),
-                account_id=account_id,
-                account_name=_non_empty(raw["AccountName"], field=f"CSV row {line} AccountName"),
-                account_code=_non_empty(raw["AccountCode"], field=f"CSV row {line} AccountCode"),
-                debit=_decimal(raw["Debit"], field=f"CSV row {line} Debit"),
-                credit=_decimal(raw["Credit"], field=f"CSV row {line} Credit"),
-                ytd_debit=_decimal(raw["YTDDebit"], field=f"CSV row {line} YTDDebit"),
-                ytd_credit=_decimal(raw["YTDCredit"], field=f"CSV row {line} YTDCredit"),
-            )
-            rows.append(row)
+    # Reading the file is as much a fail-closed step as validating it. Only the
+    # read is wrapped: every check inside raises GatewayError already, and
+    # GatewayError is not a subclass of any exception caught here.
+    try:
+        with path.open("r", encoding="utf-8-sig", newline="") as source:
+            reader = csv.DictReader(source)
+            if reader.fieldnames is None or tuple(reader.fieldnames) != CANONICAL_COLUMNS:
+                raise GatewayError("CSV must have exactly the canonical ten-column header in its declared order.")
+            for line, raw in enumerate(reader, start=2):
+                if None in raw:
+                    raise GatewayError(f"CSV row {line} has more fields than its header.")
+                report_date_text = _non_empty(raw["ReportDate"], field=f"CSV row {line} ReportDate")
+                try:
+                    report_date = date.fromisoformat(report_date_text)
+                except ValueError as exc:
+                    raise GatewayError(f"CSV row {line} ReportDate must be ISO YYYY-MM-DD.") from exc
+                account_id = _non_empty(raw["AccountID"], field=f"CSV row {line} AccountID")
+                if account_id in seen:
+                    raise GatewayError(f"CSV has duplicate AccountID {account_id!r}.")
+                seen.add(account_id)
+                row = BalanceRow(
+                    report_date=report_date,
+                    tenant=_non_empty(raw["Tenant"], field=f"CSV row {line} Tenant"),
+                    section=_non_empty(raw["Section"], field=f"CSV row {line} Section"),
+                    account_id=account_id,
+                    account_name=_non_empty(raw["AccountName"], field=f"CSV row {line} AccountName"),
+                    account_code=_non_empty(raw["AccountCode"], field=f"CSV row {line} AccountCode"),
+                    debit=_decimal(raw["Debit"], field=f"CSV row {line} Debit"),
+                    credit=_decimal(raw["Credit"], field=f"CSV row {line} Credit"),
+                    ytd_debit=_decimal(raw["YTDDebit"], field=f"CSV row {line} YTDDebit"),
+                    ytd_credit=_decimal(raw["YTDCredit"], field=f"CSV row {line} YTDCredit"),
+                )
+                rows.append(row)
+    except UnicodeDecodeError as exc:
+        raise GatewayError(f"source CSV is not valid UTF-8 text: {path}.") from exc
+    except OSError as exc:
+        raise GatewayError(f"source CSV cannot be read: {path}.") from exc
+    except csv.Error as exc:
+        raise GatewayError(f"source CSV cannot be parsed as CSV: {path}.") from exc
     if not rows:
         raise GatewayError("CSV must contain at least one account row.")
     if len({row.tenant for row in rows}) != 1 or len({row.report_date for row in rows}) != 1:
@@ -204,7 +214,7 @@ def _load_manifest(path: Path) -> Source:
     _iso_timestamp(export["generated_at"], field="export.generated_at")
     root = package_root()
     csv_path = path_within(root / export["csv"], root / "samples", label="manifest CSV")
-    actual_hash = sha256_file(csv_path)
+    actual_hash = sha256_file(csv_path, label="manifest CSV")
     if actual_hash != export["sha256"].lower():
         raise GatewayError("manifest CSV SHA-256 does not match the supplied source file.")
     rows = _load_tb(csv_path)
@@ -465,7 +475,16 @@ def _assert_model_is_redacted(model: dict[str, Any], rows: tuple[BalanceRow, ...
     # Compare each emitted leaf string for exact equality with a forbidden value;
     # substring matching over the serialised model false-positives when an
     # ordinary numeric AccountID happens to occur inside an amount or digest.
-    forbidden = {row.tenant for row in rows} | {row.account_name for row in rows} | {row.account_id for row in rows}
+    # Tenant, account name and account code are the three source display values
+    # the README promises the model result never carries, so all three are
+    # forbidden as leaves, not only as key names. AccountID joins them because
+    # it is the join key the evidence file is indexed by.
+    forbidden = (
+        {row.tenant for row in rows}
+        | {row.account_name for row in rows}
+        | {row.account_code for row in rows}
+        | {row.account_id for row in rows}
+    )
     if any(leaf in forbidden for leaf in _leaf_strings(model)):
         raise GatewayError("Internal disclosure assertion failed: model result contains raw source display data.")
     serialised = json.dumps(model, sort_keys=True)

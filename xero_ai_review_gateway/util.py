@@ -23,11 +23,21 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
-def sha256_file(path: Path) -> str:
+def sha256_file(path: Path, *, label: str = "source file") -> str:
+    """Digest a file, converting a filesystem failure the way load_json_object does.
+
+    path_within only guarantees the resolved path exists and is contained; it
+    cannot say the name is a readable file. A manifest naming a directory must
+    stay inside the fail-closed contract rather than escape as a traceback that
+    prints the local filesystem layout.
+    """
     digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for block in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(block)
+    try:
+        with path.open("rb") as source:
+            for block in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(block)
+    except OSError as exc:
+        raise GatewayError(f"{label} cannot be read: {path}.") from exc
     return digest.hexdigest()
 
 

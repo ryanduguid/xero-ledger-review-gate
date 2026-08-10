@@ -3,10 +3,15 @@
 Every gate the README lists as "checked before review" is exercised here with
 an artefact that must be refused. Each test is written so that disabling the
 single line it names lets the artefact through and the test fails.
+
+The read path that feeds those gates is covered here too: a source file the
+operating system will not hand over, or that is not valid UTF-8 CSV, has to be
+refused as a blocked run rather than escape as a traceback naming local paths.
 """
 
 from __future__ import annotations
 
+import csv
 import json
 import shutil
 from pathlib import Path
@@ -120,7 +125,68 @@ def test_a_second_report_date_in_one_csv_is_refused(tmp_path: Path) -> None:
         _load_tb(path)
 
 
+# --- CSV read path ----------------------------------------------------------
+
+
+def test_a_source_csv_that_is_not_utf8_is_blocked_not_a_traceback(tmp_path: Path) -> None:
+    # path_within says the file exists and is contained; it cannot say the
+    # bytes decode. Without the wrapped read this is a UnicodeDecodeError
+    # traceback and exit 1, not "blocked:" and exit 2.
+    path = tmp_path / "bad.csv"
+    path.write_bytes((PKG / "samples" / "inputs" / "sample-tb-2026-06-30.csv").read_bytes().replace(b"Demo Sales", b"Demo \xff Sales"))
+
+    with pytest.raises(GatewayError, match="source CSV is not valid UTF-8"):
+        _load_tb(path)
+
+
+def test_a_source_csv_that_cannot_be_read_is_blocked_not_a_traceback(tmp_path: Path) -> None:
+    # A directory resolves and exists, so only the read itself can reject it.
+    with pytest.raises(GatewayError, match="source CSV cannot be read"):
+        _load_tb(tmp_path)
+
+
+def test_a_source_csv_the_csv_module_refuses_is_blocked_not_a_traceback(tmp_path: Path) -> None:
+    # An unterminated quote runs one field past csv.field_size_limit(), which
+    # raises csv.Error from inside the row loop rather than at open time.
+    path = tmp_path / "huge.csv"
+    source = (PKG / "samples" / "inputs" / "sample-tb-2026-06-30.csv").read_text(encoding="utf-8")
+    path.write_text(source.replace("Demo Sales", '"' + "x" * (csv.field_size_limit() + 1)), encoding="utf-8")
+
+    with pytest.raises(GatewayError, match="source CSV cannot be parsed as CSV"):
+        _load_tb(path)
+
+
+def test_a_manifest_csv_that_cannot_be_read_is_blocked_not_a_traceback(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # The digest is taken before the CSV is parsed, so a manifest naming a
+    # directory fails in sha256_file, not in _load_tb.
+    root = _sandbox(tmp_path, monkeypatch)
+    path = _manifest_path(root, CURRENT_MANIFEST)
+    manifest = _read(path)
+    manifest["export"]["csv"] = "samples/inputs"
+    _write(path, manifest)
+
+    with pytest.raises(GatewayError, match="manifest CSV cannot be read"):
+        _load_manifest(path)
+
+
 # --- manifest gates ---------------------------------------------------------
+
+
+def test_a_manifest_generated_at_without_an_offset_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The timestamp grammar is checked through the loader, not only in its own unit test.
+
+    _iso_timestamp has its own parametrised tests, but replacing the call in
+    _load_manifest with pass left the whole suite green while the gate the
+    README states for export.generated_at stopped running.
+    """
+    root = _sandbox(tmp_path, monkeypatch)
+    path = _manifest_path(root, CURRENT_MANIFEST)
+    manifest = _read(path)
+    manifest["export"]["generated_at"] = "2026-07-01T09:00:00"
+    _write(path, manifest)
+
+    with pytest.raises(GatewayError, match="explicit UTC offset"):
+        _load_manifest(path)
 
 
 def test_csv_that_does_not_match_the_declared_digest_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
