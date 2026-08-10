@@ -3,7 +3,7 @@ from __future__ import annotations
 import csv
 import json
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -55,7 +55,22 @@ class Source:
 def _non_empty(value: Any, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise GatewayError(f"{field} must be a non-empty string.")
-    return value.strip()
+    text = value.strip()
+    if any(ord(char) < 32 or ord(char) == 127 for char in text):
+        raise GatewayError(f"{field} must not contain control characters.")
+    return text
+
+
+def _iso_timestamp(value: Any, *, field: str) -> str:
+    text = _non_empty(value, field=field)
+    normalized = text[:-1] + "+00:00" if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError as exc:
+        raise GatewayError(f"{field} must be an ISO 8601 timestamp.") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise GatewayError(f"{field} must include an explicit UTC offset or Z.")
+    return text
 
 
 def _resolve_bundled(path: Path, subdir: str, *, label: str) -> Path:
@@ -160,6 +175,7 @@ def _load_manifest(path: Path) -> Source:
         raise GatewayError("report.as_at must be an ISO date.") from exc
     if export["schema"] != "xero-tb-csv.v1" or not isinstance(export["csv"], str) or not isinstance(export["sha256"], str):
         raise GatewayError("source manifest export schema, csv, or sha256 is invalid.")
+    _iso_timestamp(export["generated_at"], field="export.generated_at")
     root = package_root()
     csv_path = path_within(root / export["csv"], root / "samples", label="manifest CSV")
     actual_hash = sha256_file(csv_path)
@@ -256,6 +272,20 @@ def _variance_findings(
     minimum_percent = _decimal(operation["minimum_percent_delta"], field="minimum_percent_delta") / Decimal("100")
     current_by_id = {row.account_id: row for row in current_rows}
     prior_by_id = {row.account_id: row for row in prior_rows}
+    # Sorted and reported in full: iterating the unordered set intersection
+    # named an arbitrary one of several drifting accounts, so the same inputs
+    # produced a different message run to run.
+    drifted = sorted(
+        account_id
+        for account_id in set(current_by_id) & set(prior_by_id)
+        if current_by_id[account_id].section != prior_by_id[account_id].section
+        and section in {current_by_id[account_id].section, prior_by_id[account_id].section}
+    )
+    if drifted:
+        listed = ", ".join(repr(account_id) for account_id in drifted)
+        raise GatewayError(
+            f"Accounts changed section between periods ({listed}); review the source mapping before comparison."
+        )
     report_date = current_rows[0].report_date
     findings: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for account_id in sorted(set(current_by_id) | set(prior_by_id)):
@@ -405,31 +435,55 @@ def validate_review(*, evidence_path: Path, receipt_path: Path, decision_path: P
     decision = load_json_exact(decision_path, {"schema_version", "run_id", "reviewer_ref", "reviewed_at", "decisions"}, label="human decision")
     if evidence["schema_version"] != "xero-reviewer-evidence.v1" or receipt["schema_version"] != "xero-review-receipt.v1" or decision["schema_version"] != "xero-human-review-decision.v1":
         raise GatewayError("A supplied review artefact has an unsupported schema version.")
+    if evidence["mode"] != "synthetic" or receipt["mode"] != "synthetic":
+        raise GatewayError("Only synthetic review artefacts are supported.")
     if not (evidence["run_id"] == receipt["run_id"] == decision["run_id"]):
         raise GatewayError("Decision, evidence, and receipt must refer to the same run_id.")
     if "sha256:" + sha256_bytes(canonical_json(evidence)) != receipt["evidence_sha256"]:
         raise GatewayError("Reviewer evidence does not match the receipt's evidence digest.")
     items = evidence["items"]
-    if not isinstance(items, list) or not all(isinstance(item, dict) and "finding_id" in item for item in items):
-        raise GatewayError("Reviewer evidence items must be a list of objects that each carry a finding_id.")
+    evidence_fields = {"finding_id", "account_id", "account_code", "account_name", "current_values", "prior_values", "source_refs"}
+    if not isinstance(items, list) or not all(isinstance(item, dict) and set(item) == evidence_fields for item in items):
+        raise GatewayError("Reviewer evidence items must be a list of objects with the exact evidence shape.")
+    finding_ids = [_non_empty(item["finding_id"], field="evidence finding_id") for item in items]
+    if len(finding_ids) != len(set(finding_ids)):
+        raise GatewayError("Reviewer evidence contains duplicate finding IDs.")
+    total_findings = evidence["total_findings"]
+    if isinstance(total_findings, bool) or not isinstance(total_findings, int) or total_findings < len(items):
+        raise GatewayError("Reviewer evidence total_findings must be an integer at least as large as the visible item count.")
+    if not isinstance(evidence["truncated"], bool) or evidence["truncated"] != (total_findings > len(items)):
+        raise GatewayError("Reviewer evidence truncated must exactly describe whether findings were omitted.")
+    _non_empty(decision["reviewer_ref"], field="human decision reviewer_ref")
+    _iso_timestamp(decision["reviewed_at"], field="human decision reviewed_at")
     if not isinstance(decision["decisions"], list) or not decision["decisions"]:
         raise GatewayError("Human decision must contain at least one decision.")
-    known = {item["finding_id"] for item in items}
+    known = set(finding_ids)
     decided: set[str] = set()
     for item in decision["decisions"]:
         if not isinstance(item, dict) or set(item) != {"finding_id", "decision", "rationale"}:
             raise GatewayError("Each human decision must contain exactly finding_id, decision, and rationale.")
-        if item["finding_id"] not in known or item["finding_id"] in decided:
+        finding_id = _non_empty(item["finding_id"], field="human decision finding_id")
+        if finding_id not in known or finding_id in decided:
             raise GatewayError("Human decision refers to an unknown or duplicate finding.")
-        if item["decision"] not in ALLOWED_DECISIONS or not isinstance(item["rationale"], str) or not item["rationale"].strip():
+        if not isinstance(item["decision"], str) or item["decision"] not in ALLOWED_DECISIONS or not isinstance(item["rationale"], str) or not item["rationale"].strip():
             raise GatewayError("Human decision state or rationale is invalid.")
-        decided.add(item["finding_id"])
+        _non_empty(item["rationale"], field="human decision rationale")
+        decided.add(finding_id)
+    undecided_count = total_findings - len(decided)
+    # A decision can only name a finding the evidence actually carries, so a
+    # run whose findings were capped can never reach DECISION_RECORDED. That
+    # is deliberate - silence about an omitted finding is not a decision about
+    # it - but the caller has to be able to tell "still being reviewed" from
+    # "cannot be completed at this max_results".
     return {
         "schema_version": "xero-review-decision-validation.v1",
         "run_id": receipt["run_id"],
-        "status": "DECISION_RECORDED",
+        "status": "DECISION_RECORDED" if undecided_count == 0 else "PARTIAL_DECISION_RECORDED",
         "decision_count": len(decided),
-        "undecided_count": len(known) - len(decided),
+        "undecided_count": undecided_count,
+        "visible_findings": len(items),
+        "truncated": evidence["truncated"],
+        "completable": not evidence["truncated"],
         "limitation": "Validation records a structurally valid human decision; it does not approve, resolve, post, pay, lodge, or lock anything.",
     }
 

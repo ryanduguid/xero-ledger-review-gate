@@ -27,6 +27,7 @@ xero-ai-review-gateway = "xero_ai_review_gateway.cli:main"
 
 [tool.setuptools]
 packages = ["xero_ai_review_gateway"]
+include-package-data = false
 
 [tool.setuptools.package-data]
 xero_ai_review_gateway = [

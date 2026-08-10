@@ -48,7 +48,7 @@ xero-ai-review-gateway validate-review \
   --decision samples/decisions/sample-review-decision.json
 ```
 
-`--decision` accepts a file from the bundled `samples/` data or from `build/` under the working directory, so a real decision can sit next to the run outputs it refers to. The decision validator accepts only `ACKNOWLEDGED`, `NEEDS_EVIDENCE`, or `ESCALATED`. It records no accounting action and rejects `APPROVED`, `RESOLVED`, `POSTED`, `PAID`, `LODGED`, and `LOCKED`.
+`--decision` accepts a file from the bundled `samples/` data or from `build/` under the working directory, so a real decision can sit next to the run outputs it refers to. The decision validator accepts only `ACKNOWLEDGED`, `NEEDS_EVIDENCE`, or `ESCALATED`, requires timezone-qualified review timestamps, and reports `PARTIAL_DECISION_RECORDED` until every finding is accounted for. A decision can only name a finding the evidence carries, so a run whose findings were capped by `max_results` stays `PARTIAL_DECISION_RECORDED` however many decisions are recorded — silence about an omitted finding is not a decision about it. The validation output says which case you are in: `truncated` and `completable` distinguish a review still in progress from one that cannot complete until the run is repeated with a higher `max_results` or a narrower request. It records no accounting action and rejects `APPROVED`, `RESOLVED`, `POSTED`, `PAID`, `LODGED`, and `LOCKED`.
 
 ## Control boundary
 
@@ -57,6 +57,7 @@ xero-ai-review-gateway validate-review \
 - Monetary values use `Decimal`, never binary floating point.
 - `percent_change` in the model result is expressed in percent and quantized to four decimal places (`"18.3333"` means 18.3333%). It is `null` when there is no prior balance to compare against.
 - Current/prior trial balances are joined by stable `AccountID`, not account display name or code.
+- An account changing section between periods fails closed instead of disappearing from, or being silently reclassified within, a section-scoped comparison.
 - The model result never contains a tenant name, account name, account code, source file path, token, raw error, or free text copied from source data.
 - The package contains no network imports or mutation adapter. A future live connection must remain an authorised, read-only export handoff—not an AI-controlled broad Xero tool set.
 
