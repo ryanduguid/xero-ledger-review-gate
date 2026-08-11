@@ -1107,3 +1107,78 @@ def test_v01_source_does_not_import_a_network_client() -> None:
     package_sources = "\n".join(path.read_text(encoding="utf-8") for path in PKG.glob("*.py"))
     for forbidden in ("requests", "urllib", "http.client", "socket", "mcp"):
         assert forbidden not in package_sources
+
+
+def test_an_absurd_magnitude_is_refused_not_raised_out_of_the_balance_gate() -> None:
+    """`1E+1000000` parses and is finite, so it reached the arithmetic and the
+    first sum raised decimal.Overflow out of the gate. A gateway that exists to
+    fail closed has to refuse the file instead."""
+    from xero_ai_review_gateway.gateway import _decimal
+
+    with pytest.raises(GatewayError, match="supported magnitude range"):
+        _decimal("1E+1000000", field="YTDDebit")
+
+    # the ordinary range is untouched
+    assert _decimal("0.00", field="YTDDebit") == Decimal("0.00")
+    assert _decimal("-999999999999999999", field="YTDDebit") == Decimal("-999999999999999999")
+
+
+def test_an_absurd_percentage_is_refused_not_raised_out_of_the_projection() -> None:
+    """quantize raises InvalidOperation once the result needs more digits than
+    the context allows, and that walked out of _percent_string as a bare
+    decimal error rather than the fail-closed GatewayError."""
+    from xero_ai_review_gateway.gateway import _percent_string
+
+    with pytest.raises(GatewayError, match="supported magnitude range"):
+        _percent_string(Decimal("1E+30"))
+
+    assert _percent_string(Decimal("0.183333")) == "18.3333"
+
+
+def test_a_non_iterable_model_projection_is_refused_not_a_type_error(tmp_path: Path) -> None:
+    """tuple() on an int raises TypeError, which is not the fail-closed error
+    every other malformed-policy path produces."""
+    from xero_ai_review_gateway.gateway import _load_policy
+
+    source = json.loads((PKG / "policy" / "demo-policy-v1.json").read_text(encoding="utf-8"))
+    source["model_projection"] = 9
+    broken = tmp_path / "broken-policy.json"
+    broken.write_text(json.dumps(source), encoding="utf-8")
+
+    with pytest.raises(GatewayError, match="schema or model projection is unsupported"):
+        _load_policy(broken)
+
+
+def test_the_run_id_moves_when_only_the_source_manifest_changes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The manifests carry entity_ref, include_drafts and tracking_filters, all
+    of which change what the figures mean. Sealing only the CSVs let two runs
+    over different entities share one run_id, so a receipt did not identify its
+    own inputs and the reproducibility claim did not hold."""
+    monkeypatch.chdir(tmp_path)
+    model, _evidence, receipt = _evaluate()
+    baseline_run_id = model["run_id"]
+
+    assert set(receipt["source_digests"]) == {
+        "current", "prior", "current_manifest", "prior_manifest"}
+
+    # Change one manifest field. Both CSVs stay byte-identical, so nothing the
+    # old seed covered moves at all.
+    manifests = [
+        PKG / "samples" / "manifests" / "sample-tb-2026-06-30.manifest.json",
+        PKG / "samples" / "manifests" / "sample-tb-2026-05-31.manifest.json",
+    ]
+    # bytes, so restoring cannot rewrite the shipped files' line endings
+    originals = {path: path.read_bytes() for path in manifests}
+    try:
+        # Both of them: the gateway refuses a pair whose entity_ref disagrees,
+        # so changing one only proves that check works.
+        for path in manifests:
+            payload = json.loads(originals[path].decode("utf-8"))
+            payload["entity_ref"] = "sample-entity-002"
+            path.write_bytes((json.dumps(payload, indent=2) + "\n").encode("utf-8"))
+        moved, _e, _r = _evaluate()
+    finally:
+        for path in manifests:
+            path.write_bytes(originals[path])
+
+    assert moved["run_id"] != baseline_run_id

@@ -130,6 +130,13 @@ def _decimal(value: Any, *, field: str) -> Decimal:
         raise GatewayError(f"{field} is not a valid decimal.") from exc
     if not result.is_finite():
         raise GatewayError(f"{field} must be finite.")
+    # Finite is not enough. `1E+1000000` parses, is finite, and balances against
+    # itself, but the first sum overflows the default context and decimal
+    # raises out of the balance gate instead of the gate refusing the file.
+    # This is the one place any amount or threshold enters, so bounding it here
+    # keeps every later sum, difference and quotient inside the context.
+    if result != 0 and not -18 <= result.adjusted() <= 18:
+        raise GatewayError(f"{field} is outside the supported magnitude range.")
     return result
 
 
@@ -259,7 +266,16 @@ def _load_context(path: Path) -> tuple[Source, Source]:
 
 def _load_policy(path: Path) -> dict[str, Any]:
     policy = load_json_exact(path, {"schema_version", "policy_id", "operations", "model_projection"}, label="policy")
-    if policy["schema_version"] != "xero-review-policy.v1" or tuple(policy["model_projection"]) != MODEL_PROJECTION:
+    # tuple() on a non-iterable raises TypeError, which is not the fail-closed
+    # GatewayError every other malformed-policy path produces. Type-check first,
+    # in the same style as allowed_sections below.
+    projection = policy["model_projection"]
+    if (
+        policy["schema_version"] != "xero-review-policy.v1"
+        or not isinstance(projection, list)
+        or not all(isinstance(value, str) for value in projection)
+        or tuple(projection) != MODEL_PROJECTION
+    ):
         raise GatewayError("Policy schema or model projection is unsupported.")
     operations = policy["operations"]
     if not isinstance(operations, dict) or set(operations) != {"trial_balance_variance"}:
@@ -299,8 +315,16 @@ def _decimal_string(value: Decimal) -> str:
 
 
 def _percent_string(ratio: Decimal) -> str:
-    """Express a change ratio as a percentage quantized to four decimal places."""
-    return _decimal_string((ratio * Decimal("100")).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
+    """Express a change ratio as a percentage quantized to four decimal places.
+
+    quantize raises InvalidOperation once the result needs more digits than the
+    context allows, which a large enough ratio reaches. Everything else in this
+    module refuses rather than raises, so this converts too.
+    """
+    try:
+        return _decimal_string((ratio * Decimal("100")).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP))
+    except InvalidOperation as exc:
+        raise GatewayError("Percentage change is outside the supported magnitude range.") from exc
 
 
 def _row_values(row: BalanceRow | None) -> dict[str, str] | None:
@@ -418,6 +442,13 @@ def evaluate(*, context_path: Path, request_path: Path, policy_path: Path) -> tu
         "policy_sha256": sha256_file(policy_path),
         "current_csv_sha256": sha256_file(current.csv_path),
         "prior_csv_sha256": sha256_file(prior.csv_path),
+        # The manifests carry entity_ref, include_drafts and tracking_filters,
+        # which change what the figures mean. Sealing only the CSVs let two
+        # runs over different entities or filters share one run_id, so the
+        # receipt did not identify its own inputs and the reproducibility claim
+        # in the README was not true.
+        "current_manifest_sha256": sha256_file(current.manifest_path),
+        "prior_manifest_sha256": sha256_file(prior.manifest_path),
     }
     run_id = "sha256:" + sha256_bytes(canonical_json(run_seed))
     model = {
@@ -451,7 +482,14 @@ def evaluate(*, context_path: Path, request_path: Path, policy_path: Path) -> tu
         "mode": "synthetic",
         "policy_sha256": "sha256:" + run_seed["policy_sha256"],
         "request_sha256": "sha256:" + run_seed["request_sha256"],
-        "source_digests": {"current": "sha256:" + run_seed["current_csv_sha256"], "prior": "sha256:" + run_seed["prior_csv_sha256"]},
+        # Manifests as well as CSVs: the receipt is the record of what was
+        # reviewed, and the manifest is where entity_ref and the filters live.
+        "source_digests": {
+            "current": "sha256:" + run_seed["current_csv_sha256"],
+            "prior": "sha256:" + run_seed["prior_csv_sha256"],
+            "current_manifest": "sha256:" + run_seed["current_manifest_sha256"],
+            "prior_manifest": "sha256:" + run_seed["prior_manifest_sha256"],
+        },
         "result_sha256": "sha256:" + sha256_bytes(canonical_json(model)),
         "evidence_sha256": "sha256:" + sha256_bytes(canonical_json(evidence)),
         "code_version": "0.1.0",
