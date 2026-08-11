@@ -1,21 +1,19 @@
 # Contributing
 
-This repository is a design reference for a fixed-policy AI review boundary, not a production connector. Its value is what it refuses to do, so the refusals are the part to protect.
+This repository demonstrates a fixed-policy boundary for AI-assisted trial-balance review. Treat the refusals below as the part worth protecting; they are what the design exists to show.
 
-## The boundary is the feature
-
-Contributions must not add:
+## What contributions must not add
 
 - OAuth, network calls, or any live Xero connection
 - model or LLM invocation
 - any tool that mutates accounting data
 
-A change that widens the model-facing payload, or that lets reviewer-only evidence reach a model-facing structure, needs an explicit argument in the pull request for why the narrower version does not work.
+If your change widens the model-facing payload, or lets reviewer-only evidence reach a model-facing structure, argue in the pull request why the narrower version does not work.
 
 ## Data boundary
 
-- Synthetic data only. The `.gitignore` blocks `.csv` outside `xero_ai_review_gateway/samples/inputs/`, plus `.env`, `.env.*`, `*.token` and `*.pem`.
-- Do not commit anything drawn from a real Xero organisation, including account names, tenant identifiers and balances.
+- Use synthetic data. The `.gitignore` blocks `.csv` outside `xero_ai_review_gateway/samples/inputs/`, plus `.env`, `.env.*`, `*.token` and `*.pem`.
+- Keep anything drawn from a real Xero organisation out of the repository, including account names, tenant identifiers and balances.
 
 ## Local verification
 
@@ -31,6 +29,6 @@ CI runs the tests on Python 3.10 through 3.13, plus a packaging job and CodeQL.
 
 ## Pull requests
 
-State which policy or gate the change affects and show the test that holds it. A gate with no test that fails when the gate is removed is not a gate.
+State which policy or gate your change affects and show the test that holds it. Delete the gate in your working copy and confirm the test fails. A test that passes either way holds nothing.
 
 For a potential security vulnerability, follow [SECURITY.md](SECURITY.md) rather than opening an issue.
