@@ -1,5 +1,7 @@
 # Xero AI Review Gateway
 
+[![tests](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+
 A **fixed-policy ledger-review boundary for AI**, not an AI that can operate Xero.
 
 The first version consumes fabricated, validated Xero-shaped trial-balance CSVs and produces a bounded, redacted variance-review result plus separate local reviewer evidence. It deliberately has no Xero OAuth, no HTTP/MCP/LLM client, no free-form prompts, and no accounting write operation.
