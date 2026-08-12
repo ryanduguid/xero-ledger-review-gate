@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+from xero_ai_review_gateway import __version__
 from xero_ai_review_gateway.errors import GatewayError
 from xero_ai_review_gateway.gateway import ALLOWED_DECISIONS, MODEL_PROJECTION, BalanceRow, _assert_model_is_redacted, _iso_timestamp, _load_tb, _variance_findings, evaluate, validate_review, write_evaluation
 from xero_ai_review_gateway.util import canonical_json, package_root, sha256_bytes
@@ -69,6 +70,25 @@ def test_policy_bound_evaluation_returns_one_redacted_revenue_finding() -> None:
     assert "acct-300" not in model_text
     assert evidence["items"][0]["account_name"] == "Demo Sales"
     assert receipt["run_id"] == model["run_id"]
+    assert receipt["code_version"] == __version__
+
+
+def test_blank_account_code_is_not_a_redaction_sentinel() -> None:
+    row = _row("codeless")
+    row = BalanceRow(
+        report_date=row.report_date,
+        tenant=row.tenant,
+        section=row.section,
+        account_id=row.account_id,
+        account_name=row.account_name,
+        account_code="",
+        debit=row.debit,
+        credit=row.credit,
+        ytd_debit=row.ytd_debit,
+        ytd_credit=row.ytd_credit,
+    )
+
+    _assert_model_is_redacted({"optional_display_value": ""}, (row,))
 
 
 def test_evaluation_writes_only_below_cwd_build_and_decision_can_be_validated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

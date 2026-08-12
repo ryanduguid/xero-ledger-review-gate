@@ -104,6 +104,33 @@ def test_duplicate_account_id_is_refused(tmp_path: Path) -> None:
         _load_tb(path)
 
 
+def test_exported_codeless_bank_account_is_accepted(tmp_path: Path) -> None:
+    path = _tb(tmp_path, ("Demo Bank,1000,", "Demo Bank,,"))
+
+    rows = _load_tb(path)
+
+    bank = next(row for row in rows if row.account_id == "acct-100")
+    assert bank.account_code == ""
+
+
+@pytest.mark.parametrize(
+    ("field", "old", "new"),
+    [
+        ("Tenant", "Demo Entity Pty Ltd,Assets", ",Assets"),
+        ("Section", ",Assets,acct-100", ",,acct-100"),
+        ("AccountID", ",acct-100,Demo Bank", ",,Demo Bank"),
+        ("AccountName", ",Demo Bank,1000,", ",,1000,"),
+    ],
+)
+def test_codeless_account_support_keeps_identity_fields_required(
+    tmp_path: Path, field: str, old: str, new: str
+) -> None:
+    path = _tb(tmp_path, (old, new))
+
+    with pytest.raises(GatewayError, match=rf"{field} must be a non-empty string"):
+        _load_tb(path)
+
+
 def test_unbalanced_ytd_columns_fail_closed_even_when_the_movement_balances(tmp_path: Path) -> None:
     path = _tb(tmp_path, ("10000.00,0.00,50000.00", "10000.00,0.00,50001.00"))
 
