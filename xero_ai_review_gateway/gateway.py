@@ -12,6 +12,7 @@ from typing import Any
 
 from .errors import GatewayError
 from .util import build_root, canonical_json, load_json_exact, load_json_object, package_root, path_within, sha256_bytes, sha256_file
+from .version import __version__
 
 
 CANONICAL_COLUMNS = (
@@ -70,6 +71,15 @@ class Source:
 def _non_empty(value: Any, *, field: str) -> str:
     if not isinstance(value, str) or not value.strip():
         raise GatewayError(f"{field} must be a non-empty string.")
+    text = value.strip()
+    if any(ord(char) < 32 or ord(char) == 127 for char in text):
+        raise GatewayError(f"{field} must not contain control characters.")
+    return text
+
+
+def _optional_text(value: Any, *, field: str) -> str:
+    if not isinstance(value, str):
+        raise GatewayError(f"{field} must be a string.")
     text = value.strip()
     if any(ord(char) < 32 or ord(char) == 127 for char in text):
         raise GatewayError(f"{field} must not contain control characters.")
@@ -169,7 +179,7 @@ def _load_tb(path: Path) -> tuple[BalanceRow, ...]:
                     section=_non_empty(raw["Section"], field=f"CSV row {line} Section"),
                     account_id=account_id,
                     account_name=_non_empty(raw["AccountName"], field=f"CSV row {line} AccountName"),
-                    account_code=_non_empty(raw["AccountCode"], field=f"CSV row {line} AccountCode"),
+                    account_code=_optional_text(raw["AccountCode"], field=f"CSV row {line} AccountCode"),
                     debit=_decimal(raw["Debit"], field=f"CSV row {line} Debit"),
                     credit=_decimal(raw["Credit"], field=f"CSV row {line} Credit"),
                     ytd_debit=_decimal(raw["YTDDebit"], field=f"CSV row {line} YTDDebit"),
@@ -492,7 +502,7 @@ def evaluate(*, context_path: Path, request_path: Path, policy_path: Path) -> tu
         },
         "result_sha256": "sha256:" + sha256_bytes(canonical_json(model)),
         "evidence_sha256": "sha256:" + sha256_bytes(canonical_json(evidence)),
-        "code_version": "0.1.0",
+        "code_version": __version__,
     }
     _assert_model_is_redacted(model, current.rows + prior.rows)
     return model, evidence, receipt
@@ -520,7 +530,7 @@ def _assert_model_is_redacted(model: dict[str, Any], rows: tuple[BalanceRow, ...
     forbidden = (
         {row.tenant for row in rows}
         | {row.account_name for row in rows}
-        | {row.account_code for row in rows}
+        | {row.account_code for row in rows if row.account_code}
         | {row.account_id for row in rows}
     )
     if any(leaf in forbidden for leaf in _leaf_strings(model)):
