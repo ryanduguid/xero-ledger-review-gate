@@ -20,6 +20,8 @@ sha256sum --check SHA256SUMS
 gh attestation verify xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway
 gh attestation verify xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway --predicate-type https://spdx.dev/Document/v2.3
 gh release view v0.1.1 -R ryanduguid/xero-ai-review-gateway --json isImmutable
+gh release verify v0.1.1 -R ryanduguid/xero-ai-review-gateway
+gh release verify-asset v0.1.1 xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway
 ```
 
 If any gate fails, inspect it before touching the tag or draft. Never move a published tag.
