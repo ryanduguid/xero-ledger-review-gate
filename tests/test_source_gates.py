@@ -21,7 +21,7 @@ import pytest
 from xero_ai_review_gateway import gateway
 from xero_ai_review_gateway.errors import GatewayError
 from xero_ai_review_gateway.gateway import _load_context, _load_manifest, _load_policy, _load_request, _load_tb
-from xero_ai_review_gateway.util import sha256_file
+from xero_ai_review_gateway.util import canonical_json, sha256_bytes, sha256_file
 
 PKG = Path(__file__).resolve().parents[1] / "xero_ai_review_gateway"
 CURRENT_MANIFEST = "sample-tb-2026-06-30.manifest.json"
@@ -48,6 +48,20 @@ def _sandbox(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 def _manifest_path(root: Path, name: str) -> Path:
     return root / "samples" / "manifests" / name
+
+
+def _review_input_paths(root: Path) -> dict[str, Path]:
+    current_manifest = _manifest_path(root, CURRENT_MANIFEST)
+    prior_manifest = _manifest_path(root, PRIOR_MANIFEST)
+    return {
+        "context_sha256": root / "samples" / "contexts" / CONTEXT,
+        "request_sha256": root / "samples" / "requests" / "sample-revenue-variance.request.json",
+        "policy_sha256": root / "policy" / "demo-policy-v1.json",
+        "current_csv_sha256": root / _read(current_manifest)["export"]["csv"],
+        "prior_csv_sha256": root / _read(prior_manifest)["export"]["csv"],
+        "current_manifest_sha256": current_manifest,
+        "prior_manifest_sha256": prior_manifest,
+    }
 
 
 def _reseal(root: Path, name: str) -> None:
@@ -80,6 +94,18 @@ def _tb(tmp_path: Path, *replacements: tuple[str, str]) -> Path:
     path = tmp_path / "edited.csv"
     path.write_text(text, encoding="utf-8")
     return path
+
+
+def _materially_changed_current_csv(content: bytes) -> bytes:
+    """A valid, balanced replacement whose revenue calculation differs."""
+    replacements = (
+        (b"10000.00,0.00,50000.00,0.00", b"20000.00,0.00,69000.00,0.00"),
+        (b"0.00,10000.00,0.00,71000.00", b"0.00,20000.00,0.00,90000.00"),
+    )
+    for old, new in replacements:
+        assert old in content
+        content = content.replace(old, new)
+    return content
 
 
 # --- CSV contract -----------------------------------------------------------
@@ -194,6 +220,116 @@ def test_a_manifest_csv_that_cannot_be_read_is_blocked_not_a_traceback(tmp_path:
 
     with pytest.raises(GatewayError, match="manifest CSV cannot be read"):
         _load_manifest(path)
+
+
+def test_manifest_rows_and_digest_are_bound_to_one_csv_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replacing the path after its read cannot mix content and provenance."""
+    root = _sandbox(tmp_path, monkeypatch)
+    manifest_path = _manifest_path(root, CURRENT_MANIFEST)
+    manifest = _read(manifest_path)
+    csv_path = (root / manifest["export"]["csv"]).resolve()
+    original = csv_path.read_bytes()
+    replacement = _materially_changed_current_csv(original)
+    assert replacement != original
+
+    real_read_bytes = Path.read_bytes
+    snapshots = 0
+
+    def read_then_replace(path: Path) -> bytes:
+        nonlocal snapshots
+        content = real_read_bytes(path)
+        if path.resolve() == csv_path:
+            snapshots += 1
+            path.write_bytes(replacement)
+        return content
+
+    monkeypatch.setattr(Path, "read_bytes", read_then_replace)
+
+    source = _load_manifest(manifest_path)
+
+    assert snapshots == 1
+    assert source.csv_snapshot.content == original
+    assert source.csv_snapshot.sha256 == sha256_bytes(original)
+    assert next(row for row in source.rows if row.account_id == "acct-300").ytd_credit == 71000
+    assert real_read_bytes(csv_path) == replacement
+    monkeypatch.setattr(Path, "read_bytes", real_read_bytes)
+    replacement_rows = _load_tb(csv_path)
+    assert next(row for row in replacement_rows if row.account_id == "acct-300").ytd_credit == 90000
+
+
+def test_evaluation_reads_every_provenance_input_exactly_once(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _sandbox(tmp_path, monkeypatch)
+    input_paths = {path.resolve() for path in _review_input_paths(root).values()}
+    read_counts = dict.fromkeys(input_paths, 0)
+    real_read_bytes = Path.read_bytes
+
+    def counted_read(path: Path) -> bytes:
+        resolved = path.resolve()
+        if resolved in read_counts:
+            read_counts[resolved] += 1
+        return real_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", counted_read)
+
+    gateway.evaluate(
+        context_path=Path("samples/contexts") / CONTEXT,
+        request_path=Path("samples/requests/sample-revenue-variance.request.json"),
+        policy_path=Path("policy/demo-policy-v1.json"),
+    )
+
+    assert len(read_counts) == 7
+    assert set(read_counts.values()) == {1}
+
+
+def test_a_path_swap_after_calculation_cannot_change_the_bound_run_digests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _sandbox(tmp_path, monkeypatch)
+    inputs = _review_input_paths(root)
+    originals = {name: path.read_bytes() for name, path in inputs.items()}
+    replacements = {name: content + b"\n" for name, content in originals.items()}
+    replacements["current_csv_sha256"] = _materially_changed_current_csv(originals["current_csv_sha256"])
+    expected_seed = {name: sha256_bytes(content) for name, content in originals.items()}
+    expected_run_id = "sha256:" + sha256_bytes(canonical_json(expected_seed))
+    baseline, _baseline_evidence, _baseline_receipt = gateway.evaluate(
+        context_path=Path("samples/contexts") / CONTEXT,
+        request_path=Path("samples/requests/sample-revenue-variance.request.json"),
+        policy_path=Path("policy/demo-policy-v1.json"),
+    )
+    real_variance_findings = gateway._variance_findings
+    swaps = 0
+
+    def calculate_then_replace(*args, **kwargs):
+        nonlocal swaps
+        findings = real_variance_findings(*args, **kwargs)
+        for name, path in inputs.items():
+            path.write_bytes(replacements[name])
+            swaps += 1
+        return findings
+
+    monkeypatch.setattr(gateway, "_variance_findings", calculate_then_replace)
+
+    model, _evidence, receipt = gateway.evaluate(
+        context_path=Path("samples/contexts") / CONTEXT,
+        request_path=Path("samples/requests/sample-revenue-variance.request.json"),
+        policy_path=Path("policy/demo-policy-v1.json"),
+    )
+
+    assert swaps == 7
+    assert model["findings"] == baseline["findings"]
+    assert model["findings"][0]["current_ytd_net"] == "-71000.00"
+    assert b"90000.00" in replacements["current_csv_sha256"]
+    assert model["run_id"] == baseline["run_id"] == expected_run_id
+    assert receipt["policy_sha256"] == "sha256:" + expected_seed["policy_sha256"]
+    assert receipt["request_sha256"] == "sha256:" + expected_seed["request_sha256"]
+    assert receipt["source_digests"] == {
+        "current": "sha256:" + expected_seed["current_csv_sha256"],
+        "prior": "sha256:" + expected_seed["prior_csv_sha256"],
+        "current_manifest": "sha256:" + expected_seed["current_manifest_sha256"],
+        "prior_manifest": "sha256:" + expected_seed["prior_manifest_sha256"],
+    }
+    for name, path in inputs.items():
+        assert path.read_bytes() == replacements[name]
 
 
 # --- manifest gates ---------------------------------------------------------

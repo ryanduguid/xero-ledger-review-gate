@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,33 @@ def sha256_bytes(value: bytes) -> str:
     return hashlib.sha256(value).hexdigest()
 
 
+@dataclass(frozen=True)
+class FileSnapshot:
+    """Immutable bytes and the digest calculated from that exact read."""
+
+    path: Path
+    content: bytes
+    sha256: str
+
+
+def _snapshot_file(path: Path, *, label: str, missing_is_unreadable: bool) -> FileSnapshot:
+    try:
+        content = path.read_bytes()
+    except FileNotFoundError as exc:
+        if not missing_is_unreadable:
+            raise GatewayError(f"{label} does not exist: {path}.") from exc
+        raise GatewayError(f"{label} cannot be read: {path}.") from exc
+    except OSError as exc:
+        raise GatewayError(f"{label} cannot be read: {path}.") from exc
+    return FileSnapshot(path=path, content=content, sha256=sha256_bytes(content))
+
+
+def snapshot_file(path: Path, *, label: str = "source file") -> FileSnapshot:
+    """Read a file once and bind its immutable bytes to their SHA-256 digest."""
+
+    return _snapshot_file(path, label=label, missing_is_unreadable=True)
+
+
 def sha256_file(path: Path, *, label: str = "source file") -> str:
     """Digest a file, converting a filesystem failure the way load_json_object does.
 
@@ -31,41 +59,42 @@ def sha256_file(path: Path, *, label: str = "source file") -> str:
     stay inside the fail-closed contract rather than escape as a traceback that
     prints the local filesystem layout.
     """
-    digest = hashlib.sha256()
-    try:
-        with path.open("rb") as source:
-            for block in iter(lambda: source.read(1024 * 1024), b""):
-                digest.update(block)
-    except OSError as exc:
-        raise GatewayError(f"{label} cannot be read: {path}.") from exc
-    return digest.hexdigest()
+    return snapshot_file(path, label=label).sha256
 
 
 def canonical_json(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
-def load_json_object(path: Path, *, label: str) -> dict[str, Any]:
-    """Read a JSON object whose key set is not fixed by this gateway."""
+def load_json_object_snapshot(path: Path, *, label: str) -> tuple[dict[str, Any], FileSnapshot]:
+    """Parse JSON from the same immutable bytes whose digest is retained."""
+    snapshot = _snapshot_file(path, label=label, missing_is_unreadable=False)
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as exc:
-        raise GatewayError(f"{label} does not exist: {path}.") from exc
+        raw = json.loads(snapshot.content.decode("utf-8"))
     except UnicodeDecodeError as exc:
         raise GatewayError(f"{label} is not valid UTF-8 text: {path}.") from exc
-    except OSError as exc:
-        raise GatewayError(f"{label} cannot be read: {path}.") from exc
     except json.JSONDecodeError as exc:
         raise GatewayError(f"{label} is not valid JSON: {path}.") from exc
     if not isinstance(raw, dict):
         raise GatewayError(f"{label} must be a JSON object: {path}.")
+    return raw, snapshot
+
+
+def load_json_object(path: Path, *, label: str) -> dict[str, Any]:
+    """Read a JSON object whose key set is not fixed by this gateway."""
+    raw, _snapshot = load_json_object_snapshot(path, label=label)
     return raw
 
 
-def load_json_exact(path: Path, required: set[str], *, label: str) -> dict[str, Any]:
-    raw = load_json_object(path, label=label)
+def load_json_exact_snapshot(path: Path, required: set[str], *, label: str) -> tuple[dict[str, Any], FileSnapshot]:
+    raw, snapshot = load_json_object_snapshot(path, label=label)
     if set(raw) != required:
         raise GatewayError(f"{label} must contain exactly: {', '.join(sorted(required))}.")
+    return raw, snapshot
+
+
+def load_json_exact(path: Path, required: set[str], *, label: str) -> dict[str, Any]:
+    raw, _snapshot = load_json_exact_snapshot(path, required, label=label)
     return raw
 
 
