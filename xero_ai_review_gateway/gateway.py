@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
 import os
 import re
@@ -11,7 +12,18 @@ from pathlib import Path
 from typing import Any
 
 from .errors import GatewayError
-from .util import build_root, canonical_json, load_json_exact, load_json_object, package_root, path_within, sha256_bytes, sha256_file
+from .util import (
+    FileSnapshot,
+    build_root,
+    canonical_json,
+    load_json_exact,
+    load_json_exact_snapshot,
+    load_json_object,
+    package_root,
+    path_within,
+    sha256_bytes,
+    snapshot_file,
+)
 from .version import __version__
 
 
@@ -66,6 +78,8 @@ class Source:
     manifest: dict[str, Any]
     csv_path: Path
     rows: tuple[BalanceRow, ...]
+    manifest_snapshot: FileSnapshot
+    csv_snapshot: FileSnapshot
 
 
 def _non_empty(value: Any, *, field: str) -> str:
@@ -150,14 +164,11 @@ def _decimal(value: Any, *, field: str) -> Decimal:
     return result
 
 
-def _load_tb(path: Path) -> tuple[BalanceRow, ...]:
+def _load_tb_snapshot(snapshot: FileSnapshot) -> tuple[BalanceRow, ...]:
     rows: list[BalanceRow] = []
     seen: set[str] = set()
-    # Reading the file is as much a fail-closed step as validating it. Only the
-    # read is wrapped: every check inside raises GatewayError already, and
-    # GatewayError is not a subclass of any exception caught here.
     try:
-        with path.open("r", encoding="utf-8-sig", newline="") as source:
+        with io.StringIO(snapshot.content.decode("utf-8-sig"), newline="") as source:
             reader = csv.DictReader(source)
             if reader.fieldnames is None or tuple(reader.fieldnames) != CANONICAL_COLUMNS:
                 raise GatewayError("CSV must have exactly the canonical ten-column header in its declared order.")
@@ -187,11 +198,9 @@ def _load_tb(path: Path) -> tuple[BalanceRow, ...]:
                 )
                 rows.append(row)
     except UnicodeDecodeError as exc:
-        raise GatewayError(f"source CSV is not valid UTF-8 text: {path}.") from exc
-    except OSError as exc:
-        raise GatewayError(f"source CSV cannot be read: {path}.") from exc
+        raise GatewayError(f"source CSV is not valid UTF-8 text: {snapshot.path}.") from exc
     except csv.Error as exc:
-        raise GatewayError(f"source CSV cannot be parsed as CSV: {path}.") from exc
+        raise GatewayError(f"source CSV cannot be parsed as CSV: {snapshot.path}.") from exc
     if not rows:
         raise GatewayError("CSV must contain at least one account row.")
     if len({row.tenant for row in rows}) != 1 or len({row.report_date for row in rows}) != 1:
@@ -204,8 +213,18 @@ def _load_tb(path: Path) -> tuple[BalanceRow, ...]:
     return tuple(rows)
 
 
+def _load_tb(path: Path) -> tuple[BalanceRow, ...]:
+    # The snapshot catches filesystem failures before parsing and ensures the
+    # rows and digest can only describe the same immutable byte sequence.
+    return _load_tb_snapshot(snapshot_file(path, label="source CSV"))
+
+
 def _load_manifest(path: Path) -> Source:
-    manifest = load_json_exact(path, {"schema_version", "mode", "source_system", "entity_ref", "report", "export"}, label="source manifest")
+    manifest, manifest_snapshot = load_json_exact_snapshot(
+        path,
+        {"schema_version", "mode", "source_system", "entity_ref", "report", "export"},
+        label="source manifest",
+    )
     if manifest["schema_version"] != "xero-source-manifest.v1" or manifest["mode"] != "synthetic":
         raise GatewayError("Only xero-source-manifest.v1 in synthetic mode is supported.")
     if manifest["source_system"] != "xero-trial-balance-export":
@@ -231,13 +250,20 @@ def _load_manifest(path: Path) -> Source:
     _iso_timestamp(export["generated_at"], field="export.generated_at")
     root = package_root()
     csv_path = path_within(root / export["csv"], root / "samples", label="manifest CSV")
-    actual_hash = sha256_file(csv_path, label="manifest CSV")
-    if actual_hash != export["sha256"].lower():
+    csv_snapshot = snapshot_file(csv_path, label="manifest CSV")
+    if csv_snapshot.sha256 != export["sha256"].lower():
         raise GatewayError("manifest CSV SHA-256 does not match the supplied source file.")
-    rows = _load_tb(csv_path)
+    rows = _load_tb_snapshot(csv_snapshot)
     if rows[0].report_date != as_at:
         raise GatewayError("manifest report.as_at and CSV ReportDate do not match.")
-    return Source(manifest_path=path, manifest=manifest, csv_path=csv_path, rows=rows)
+    return Source(
+        manifest_path=path,
+        manifest=manifest,
+        csv_path=csv_path,
+        rows=rows,
+        manifest_snapshot=manifest_snapshot,
+        csv_snapshot=csv_snapshot,
+    )
 
 
 def _au_financial_year(value: date) -> int:
@@ -245,8 +271,12 @@ def _au_financial_year(value: date) -> int:
     return value.year + 1 if value.month >= 7 else value.year
 
 
-def _load_context(path: Path) -> tuple[Source, Source]:
-    context = load_json_exact(path, {"schema_version", "mode", "current_manifest", "prior_manifest"}, label="review context")
+def _load_context_snapshot(path: Path) -> tuple[Source, Source, FileSnapshot]:
+    context, context_snapshot = load_json_exact_snapshot(
+        path,
+        {"schema_version", "mode", "current_manifest", "prior_manifest"},
+        label="review context",
+    )
     if context["schema_version"] != "xero-review-context.v1" or context["mode"] != "synthetic":
         raise GatewayError("Only xero-review-context.v1 in synthetic mode is supported.")
     root = package_root()
@@ -271,11 +301,20 @@ def _load_context(path: Path) -> tuple[Source, Source]:
         raise GatewayError(
             "Current and prior reports fall in different financial years; YTD balances reset on 1 July and are not comparable."
         )
+    return current, prior, context_snapshot
+
+
+def _load_context(path: Path) -> tuple[Source, Source]:
+    current, prior, _snapshot = _load_context_snapshot(path)
     return current, prior
 
 
-def _load_policy(path: Path) -> dict[str, Any]:
-    policy = load_json_exact(path, {"schema_version", "policy_id", "operations", "model_projection"}, label="policy")
+def _load_policy_snapshot(path: Path) -> tuple[dict[str, Any], FileSnapshot]:
+    policy, policy_snapshot = load_json_exact_snapshot(
+        path,
+        {"schema_version", "policy_id", "operations", "model_projection"},
+        label="policy",
+    )
     # tuple() on a non-iterable raises TypeError, which is not the fail-closed
     # GatewayError every other malformed-policy path produces. Type-check first,
     # in the same style as allowed_sections below.
@@ -304,11 +343,20 @@ def _load_policy(path: Path) -> dict[str, Any]:
     for field in ("minimum_absolute_delta", "minimum_percent_delta"):
         if _decimal(operation[field], field=field) < 0:
             raise GatewayError(f"Policy {field} cannot be negative.")
+    return policy, policy_snapshot
+
+
+def _load_policy(path: Path) -> dict[str, Any]:
+    policy, _snapshot = _load_policy_snapshot(path)
     return policy
 
 
-def _load_request(path: Path, policy: dict[str, Any]) -> dict[str, Any]:
-    request = load_json_exact(path, {"schema_version", "request_id", "operation", "section", "policy_id"}, label="review request")
+def _load_request_snapshot(path: Path, policy: dict[str, Any]) -> tuple[dict[str, Any], FileSnapshot]:
+    request, request_snapshot = load_json_exact_snapshot(
+        path,
+        {"schema_version", "request_id", "operation", "section", "policy_id"},
+        label="review request",
+    )
     if request["schema_version"] != "xero-review-request.v1" or request["operation"] != "trial_balance_variance":
         raise GatewayError("Only the trial_balance_variance request is supported.")
     if request["policy_id"] != policy["policy_id"]:
@@ -317,6 +365,11 @@ def _load_request(path: Path, policy: dict[str, Any]) -> dict[str, Any]:
     if request["section"] not in allowed_sections:
         raise GatewayError("Request section is not allowlisted by policy.")
     _non_empty(request["request_id"], field="request_id")
+    return request, request_snapshot
+
+
+def _load_request(path: Path, policy: dict[str, Any]) -> dict[str, Any]:
+    request, _snapshot = _load_request_snapshot(path, policy)
     return request
 
 
@@ -432,9 +485,9 @@ def evaluate(*, context_path: Path, request_path: Path, policy_path: Path) -> tu
     context_path = _resolve_bundled(context_path, "samples", label="context")
     request_path = _resolve_bundled(request_path, "samples", label="request")
     policy_path = _resolve_bundled(policy_path, "policy", label="policy")
-    policy = _load_policy(policy_path)
-    request = _load_request(request_path, policy)
-    current, prior = _load_context(context_path)
+    policy, policy_snapshot = _load_policy_snapshot(policy_path)
+    request, request_snapshot = _load_request_snapshot(request_path, policy)
+    current, prior, context_snapshot = _load_context_snapshot(context_path)
     operation = policy["operations"]["trial_balance_variance"]
     all_findings = _variance_findings(
         current.rows,
@@ -447,18 +500,18 @@ def evaluate(*, context_path: Path, request_path: Path, policy_path: Path) -> tu
     findings = all_findings[: operation["max_results"]]
     truncated = total_findings > operation["max_results"]
     run_seed = {
-        "context_sha256": sha256_file(context_path),
-        "request_sha256": sha256_file(request_path),
-        "policy_sha256": sha256_file(policy_path),
-        "current_csv_sha256": sha256_file(current.csv_path),
-        "prior_csv_sha256": sha256_file(prior.csv_path),
+        "context_sha256": context_snapshot.sha256,
+        "request_sha256": request_snapshot.sha256,
+        "policy_sha256": policy_snapshot.sha256,
+        "current_csv_sha256": current.csv_snapshot.sha256,
+        "prior_csv_sha256": prior.csv_snapshot.sha256,
         # The manifests carry entity_ref, include_drafts and tracking_filters,
         # which change what the figures mean. Sealing only the CSVs let two
         # runs over different entities or filters share one run_id, so the
         # receipt did not identify its own inputs and the reproducibility claim
         # in the README was not true.
-        "current_manifest_sha256": sha256_file(current.manifest_path),
-        "prior_manifest_sha256": sha256_file(prior.manifest_path),
+        "current_manifest_sha256": current.manifest_snapshot.sha256,
+        "prior_manifest_sha256": prior.manifest_snapshot.sha256,
     }
     run_id = "sha256:" + sha256_bytes(canonical_json(run_seed))
     model = {
