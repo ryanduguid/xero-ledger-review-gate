@@ -693,7 +693,7 @@ def test_the_resealed_pack_helper_leaves_a_run_that_still_validates(tmp_path: Pa
 def test_a_decision_naming_a_finding_the_evidence_does_not_carry_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """This is the binding between the human sign-off and the reviewer evidence.
 
-    Without it a fabricated finding_id counts toward the decided set, so
+    Without it a fabricated finding_id counts towards the decided set, so
     undecided_count reaches zero and validate_review reports DECISION_RECORDED
     for a run whose real findings were never looked at.
     """
