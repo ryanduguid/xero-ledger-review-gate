@@ -66,11 +66,30 @@ def canonical_json(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
 
 
+def _object_refusing_duplicate_keys(pairs: list[tuple[str, Any]], *, label: str, path: Path) -> dict[str, Any]:
+    """Build a JSON object, refusing a key spelled twice instead of keeping its last value.
+
+    Plain json.loads is last-key-wins, so a manifest carrying two sha256 keys
+    parses to the second digest alone and the exact-key-set gate never sees
+    that two were supplied. json.loads runs this hook for every object at
+    every nesting level.
+    """
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise GatewayError(f"{label} has duplicate key {key!r}: {path}.")
+        result[key] = value
+    return result
+
+
 def load_json_object_snapshot(path: Path, *, label: str) -> tuple[dict[str, Any], FileSnapshot]:
     """Parse JSON from the same immutable bytes whose digest is retained."""
     snapshot = _snapshot_file(path, label=label, missing_is_unreadable=False)
     try:
-        raw = json.loads(snapshot.content.decode("utf-8"))
+        raw = json.loads(
+            snapshot.content.decode("utf-8"),
+            object_pairs_hook=lambda pairs: _object_refusing_duplicate_keys(pairs, label=label, path=path),
+        )
     except UnicodeDecodeError as exc:
         raise GatewayError(f"{label} is not valid UTF-8 text: {path}.") from exc
     except json.JSONDecodeError as exc:

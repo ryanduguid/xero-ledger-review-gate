@@ -52,6 +52,29 @@ def test_the_exact_declared_key_set_is_accepted(tmp_path: Path) -> None:
     }
 
 
+@pytest.mark.parametrize(
+    ("payload", "duplicated"),
+    [
+        # Written as raw text: json.dumps cannot spell a key twice, which is
+        # exactly why only the parser's own hook can see the duplicate. Plain
+        # json.loads is last-key-wins, so a manifest carrying two sha256 keys
+        # verified only the second digest and the exact key-set gate above
+        # never knew two were supplied.
+        ('{"schema_version": "v1", "schema_version": "v2", "run_id": "sha256:0"}', "schema_version"),
+        # Nested one level down: the exact key-set gate only reads the top
+        # level, so the hook is the one line that can refuse this.
+        ('{"schema_version": "v1", "run_id": {"sha256": "a", "sha256": "b"}}', "sha256"),
+    ],
+)
+def test_a_duplicate_key_at_any_depth_is_refused_not_last_key_wins(tmp_path: Path, payload: str, duplicated: str) -> None:
+    bad = tmp_path / "bad.json"
+    bad.write_text(payload, encoding="utf-8")
+
+    for loader in (lambda: load_json_object(bad, label="test artefact"), lambda: load_json_exact(bad, {"schema_version", "run_id"}, label="test artefact")):
+        with pytest.raises(GatewayError, match=f"test artefact has duplicate key '{duplicated}'"):
+            loader()
+
+
 def test_non_utf8_json_is_blocked_not_a_traceback(tmp_path: Path) -> None:
     bad = tmp_path / "bad.json"
     bad.write_bytes(b"\xff\xfe{}")
