@@ -11,3 +11,10 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    groups:
+      # init and analyze are separate dependencies to Dependabot but must
+      # move together: a job running one release against the other's config
+      # fails outright. Grouped so the pair can never arrive split.
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
