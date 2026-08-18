@@ -831,23 +831,98 @@ def test_a_decision_state_that_is_not_a_string_is_refused_not_a_type_error(tmp_p
         _validate(_resealed_run(tmp_path, decision_edit=listify))
 
 
-@pytest.mark.parametrize("decisions", [[], {}, "ACKNOWLEDGED", None])
-def test_a_decision_file_that_records_no_decision_is_refused(
+@pytest.mark.parametrize("decisions", [{}, "ACKNOWLEDGED", None])
+def test_a_decisions_field_that_is_not_a_list_is_refused(
     decisions: object, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """An empty decisions array is not a partial review; it is a file that decided nothing.
-
-    Without this gate an empty list reaches undecided_count == total_findings
-    and is reported as PARTIAL_DECISION_RECORDED, so a decision file recording
-    nothing at all becomes a valid review record instead of a blocked run.
-    """
+    """A non-list decisions field must be refused before anything tries to iterate it."""
     monkeypatch.chdir(tmp_path)
 
     def replace(decision: dict) -> None:
         decision["decisions"] = decisions
 
-    with pytest.raises(GatewayError, match="must contain at least one decision"):
+    with pytest.raises(GatewayError, match="decisions must be a list"):
         _validate(_resealed_run(tmp_path, decision_edit=replace))
+
+
+def test_a_decision_file_that_records_no_decision_against_findings_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty decisions array is not a partial review; it is a file that decided nothing.
+
+    Without this gate an empty list reaches undecided_count == total_findings
+    and is reported as PARTIAL_DECISION_RECORDED, so a decision file recording
+    nothing at all becomes a valid review record instead of a blocked run. The
+    empty list is a sign-off only for a run whose evidence carries no findings.
+    """
+    monkeypatch.chdir(tmp_path)
+
+    def replace(decision: dict) -> None:
+        decision["decisions"] = []
+
+    with pytest.raises(GatewayError, match="at least one decision when the evidence carries findings"):
+        _validate(_resealed_run(tmp_path, decision_edit=replace))
+
+
+def _clean_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[dict[str, Path], dict]:
+    """A completed run in tmp_path/build whose evidence carries zero findings."""
+    from xero_ai_review_gateway import gateway
+
+    monkeypatch.setattr(gateway, "_variance_findings", lambda *args, **kwargs: [])
+    monkeypatch.chdir(tmp_path)
+    model, evidence, receipt = _evaluate()
+    assert model["total_findings"] == 0
+    assert evidence["items"] == []
+    assert evidence["truncated"] is False
+    return write_evaluation(model, evidence, receipt, Path("build") / "run"), receipt
+
+
+def _write_decision(tmp_path: Path, receipt: dict, decisions: list) -> Path:
+    decision = {
+        "schema_version": "xero-human-review-decision.v1",
+        "run_id": receipt["run_id"],
+        "reviewer_ref": "unit-test-reviewer",
+        "reviewed_at": "2026-08-09T00:00:00Z",
+        "decisions": decisions,
+    }
+    decision_path = tmp_path / "build" / "run" / "decision.json"
+    decision_path.write_text(json.dumps(decision, indent=2) + "\n", encoding="utf-8")
+    return decision_path
+
+
+def test_a_clean_run_with_zero_findings_is_recorded_end_to_end(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A run that found nothing still needs its sign-off recorded.
+
+    Requiring at least one decision entry while every entry must name a finding
+    the evidence carries made a clean run's sign-off structurally unrecordable:
+    no decision file could reach DECISION_RECORDED. The empty decisions list is
+    that sign-off; reviewer_ref, reviewed_at and run_id record who reviewed
+    which run.
+    """
+    paths, receipt = _clean_run(tmp_path, monkeypatch)
+    decision_path = _write_decision(tmp_path, receipt, [])
+
+    result = validate_review(evidence_path=paths["evidence"], receipt_path=paths["receipt"], decision_path=decision_path)
+
+    assert result["status"] == "DECISION_RECORDED"
+    assert result["decision_count"] == 0
+    assert result["undecided_count"] == 0
+    assert result["visible_findings"] == 0
+    assert result["truncated"] is False
+    assert result["completable"] is True
+
+
+def test_a_decision_naming_a_finding_against_a_clean_run_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Accepting the empty list must not also accept a fabricated decision entry."""
+    paths, receipt = _clean_run(tmp_path, monkeypatch)
+    decision_path = _write_decision(
+        tmp_path,
+        receipt,
+        [{"finding_id": "finding:never-emitted", "decision": "ACKNOWLEDGED", "rationale": "Nothing to review."}],
+    )
+
+    with pytest.raises(GatewayError, match="unknown or duplicate finding"):
+        validate_review(evidence_path=paths["evidence"], receipt_path=paths["receipt"], decision_path=decision_path)
 
 
 @pytest.mark.parametrize("mangle", ["not-a-dict", "extra-field", "missing-field"])

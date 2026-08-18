@@ -632,8 +632,14 @@ def validate_review(*, evidence_path: Path, receipt_path: Path, decision_path: P
         raise GatewayError("Reviewer evidence truncated must exactly describe whether findings were omitted.")
     _non_empty(decision["reviewer_ref"], field="human decision reviewer_ref")
     _iso_timestamp(decision["reviewed_at"], field="human decision reviewed_at")
-    if not isinstance(decision["decisions"], list) or not decision["decisions"]:
-        raise GatewayError("Human decision must contain at least one decision.")
+    if not isinstance(decision["decisions"], list):
+        raise GatewayError("Human decision decisions must be a list.")
+    # A clean run carries zero findings, so its sign-off is the empty decisions
+    # list: reviewer_ref, reviewed_at and run_id above still record who looked
+    # at which run. Once the evidence carries findings an empty list is not a
+    # partial review; it is a file that decided nothing, so it stays refused.
+    if not decision["decisions"] and total_findings > 0:
+        raise GatewayError("Human decision must contain at least one decision when the evidence carries findings.")
     known = set(finding_ids)
     decided: set[str] = set()
     for item in decision["decisions"]:
