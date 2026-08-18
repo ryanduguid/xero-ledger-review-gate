@@ -27,7 +27,9 @@ jobs:
       - run: python -m pip install "uv==0.12.0"
       # No -q here: pyproject's addopts already supplies it, and a second one
       # is -qq, which drops the "N passed" summary from the job log.
-      - run: uv run --locked --extra dev --python ${{ matrix.python }} pytest
+      - run: uv run --locked --extra dev pytest
+        env:
+          UV_PYTHON: ${{ matrix.python }}
 
   package:
     permissions:
