@@ -26,7 +26,8 @@ Issues = "https://github.com/ryanduguid/ElizabethAnneAlexander/issues"
 version = { attr = "elizabeth_anne_alexander.version.__version__" }
 
 [project.optional-dependencies]
-dev = ["build>=1.2", "pytest>=8"]
+dev = [
+    "ruff>=0.11", "mypy>=1.14","build>=1.2", "pytest>=8"]
 
 [project.scripts]
 elizabeth-anne-alexander = "elizabeth_anne_alexander.cli:main"
@@ -43,8 +44,20 @@ elizabeth_anne_alexander = [
   "samples/inputs/*.csv",
   "samples/manifests/*.json",
   "samples/requests/*.json",
+  "py.typed",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["elizabeth_anne_alexander", "tests"]
+
+[tool.mypy]
+python_version = "3.10"
+packages = ["elizabeth_anne_alexander"]
+ignore_missing_imports = true
+pretty = true
+

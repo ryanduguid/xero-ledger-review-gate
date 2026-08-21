@@ -1058,7 +1058,9 @@ def test_an_interrupted_rerun_leaves_the_previous_run_intact(tmp_path: Path, mon
     paths = write_evaluation(model, evidence, receipt, output_dir)
     before = {key: path.read_text(encoding="utf-8") for key, path in paths.items()}
 
-    real_write = gateway._write_json
+    from elizabeth_anne_alexander import persist
+
+    real_write = persist._write_json
     written: list[Path] = []
 
     def failing(path: Path, payload: dict) -> None:
@@ -1067,7 +1069,7 @@ def test_an_interrupted_rerun_leaves_the_previous_run_intact(tmp_path: Path, mon
             raise OSError(28, "No space left on device")
         real_write(path, payload)
 
-    monkeypatch.setattr(gateway, "_write_json", failing)
+    monkeypatch.setattr(persist, "_write_json", failing)
     second_run = dict(model, run_id="sha256:a-different-run")
 
     with pytest.raises(GatewayError, match="run output cannot be written"):
@@ -1095,7 +1097,9 @@ def test_a_pack_mixed_by_a_failed_move_is_refused_by_validate_review(tmp_path: P
     model, evidence, receipt = _evaluate()
     output_dir = Path("build") / "run"
     paths = write_evaluation(model, evidence, receipt, output_dir)
-    real_replace = gateway._replace
+    from elizabeth_anne_alexander import persist
+
+    real_replace = persist._replace
     moved: list[Path] = []
 
     def failing(source: Path, destination: Path) -> None:
@@ -1104,7 +1108,7 @@ def test_a_pack_mixed_by_a_failed_move_is_refused_by_validate_review(tmp_path: P
             raise OSError(13, "Permission denied")
         real_replace(source, destination)
 
-    monkeypatch.setattr(gateway, "_replace", failing)
+    monkeypatch.setattr(persist, "_replace", failing)
     second_run = dict(model, run_id="sha256:a-different-run")
 
     with pytest.raises(GatewayError, match="run output cannot be written"):
