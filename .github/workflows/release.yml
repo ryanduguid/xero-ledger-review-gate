@@ -16,4 +16,4 @@ jobs:
       id-token: write # Obtain the OIDC identity required to sign attestations.
     uses: ryanduguid/release-policy/.github/workflows/release-python.yml@2138799a34e5a3441c9b132113a29f9d9af86109 # v0.1.0
     with:
-      version-command: "python -c 'from xero_ai_review_gateway.version import __version__; print(__version__)'"
+      version-command: "python -c 'from elizabeth_anne_alexander.version import __version__; print(__version__)'"

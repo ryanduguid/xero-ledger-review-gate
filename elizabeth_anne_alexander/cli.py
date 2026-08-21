@@ -49,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "evaluate":
             model, evidence, receipt = evaluate(context_path=args.context, request_path=args.request, policy_path=args.policy)
             outputs = write_evaluation(model, evidence, receipt, args.out)
-            _emit(f"xero-ai-review-gateway: REVIEW_READY; {len(model['findings'])} bounded finding(s)", sys.stdout)
+            _emit(f"elizabeth-anne-alexander: REVIEW_READY; {len(model['findings'])} bounded finding(s)", sys.stdout)
             for name, path in outputs.items():
                 _emit(f"  {name}: {path}", sys.stdout)
             return 0
@@ -61,10 +61,10 @@ def main(argv: list[str] | None = None) -> int:
                 out.write_text(json.dumps(validation, indent=2, sort_keys=True) + "\n", encoding="utf-8")
             except OSError as exc:
                 raise GatewayError(f"validation output cannot be written to {out}: {exc}.") from exc
-        _emit(f"xero-ai-review-gateway: {validation['status']}; {validation['decision_count']} decision(s); {validation['undecided_count']} undecided finding(s)", sys.stdout)
+        _emit(f"elizabeth-anne-alexander: {validation['status']}; {validation['decision_count']} decision(s); {validation['undecided_count']} undecided finding(s)", sys.stdout)
         return 0
     except GatewayError as exc:
-        _emit(f"xero-ai-review-gateway: blocked: {exc}", sys.stderr)
+        _emit(f"elizabeth-anne-alexander: blocked: {exc}", sys.stderr)
         return 2
 
 

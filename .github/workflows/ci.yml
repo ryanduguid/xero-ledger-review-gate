@@ -52,15 +52,15 @@ jobs:
           python -m venv /tmp/venv
           # --no-index, or pip is free to resolve the name from PyPI and
           # test a release nobody built in this job.
-          /tmp/venv/bin/pip install --no-index --find-links dist xero-ai-review-gateway
+          /tmp/venv/bin/pip install --no-index --find-links dist elizabeth-anne-alexander
           mkdir /tmp/demo
           cd /tmp/demo
-          /tmp/venv/bin/xero-ai-review-gateway evaluate \
+          /tmp/venv/bin/elizabeth-anne-alexander evaluate \
             --context samples/contexts/sample-monthly-variance.context.json \
             --request samples/requests/sample-revenue-variance.request.json \
             --policy policy/demo-policy-v1.json \
             --out build/demo
-          /tmp/venv/bin/xero-ai-review-gateway validate-review \
+          /tmp/venv/bin/elizabeth-anne-alexander validate-review \
             --evidence build/demo/reviewer-evidence.json \
             --receipt build/demo/receipt.json \
             --decision samples/decisions/sample-review-decision.json

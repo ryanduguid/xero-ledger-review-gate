@@ -10,12 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from xero_ai_review_gateway import __version__
-from xero_ai_review_gateway.errors import GatewayError
-from xero_ai_review_gateway.gateway import ALLOWED_DECISIONS, MODEL_PROJECTION, BalanceRow, _assert_model_is_redacted, _iso_timestamp, _load_tb, _variance_findings, evaluate, validate_review, write_evaluation
-from xero_ai_review_gateway.util import canonical_json, package_root, sha256_bytes
+from elizabeth_anne_alexander import __version__
+from elizabeth_anne_alexander.errors import GatewayError
+from elizabeth_anne_alexander.gateway import ALLOWED_DECISIONS, MODEL_PROJECTION, BalanceRow, _assert_model_is_redacted, _iso_timestamp, _load_tb, _variance_findings, evaluate, validate_review, write_evaluation
+from elizabeth_anne_alexander.util import canonical_json, package_root, sha256_bytes
 
-PKG = Path(__file__).resolve().parents[1] / "xero_ai_review_gateway"
+PKG = Path(__file__).resolve().parents[1] / "elizabeth_anne_alexander"
 
 OPERATION = {
     "allowed_sections": ["Revenue"],
@@ -124,7 +124,7 @@ def test_tampered_evidence_fails_the_receipt_digest(tmp_path: Path, monkeypatch:
 
 
 def test_partially_decided_findings_are_counted_as_undecided(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from xero_ai_review_gateway import gateway
+    from elizabeth_anne_alexander import gateway
 
     real = gateway._variance_findings
 
@@ -169,7 +169,7 @@ def test_a_truncated_run_reports_that_it_cannot_be_completed(
     PARTIAL_DECISION_RECORDED however many decisions are recorded. The result
     has to say so rather than looking like a review still in progress.
     """
-    from xero_ai_review_gateway import gateway
+    from elizabeth_anne_alexander import gateway
 
     real = gateway._variance_findings
 
@@ -287,7 +287,7 @@ def test_account_present_only_in_the_prior_period_is_reported() -> None:
 
 
 def test_findings_beyond_max_results_are_disclosed_not_silently_dropped(monkeypatch: pytest.MonkeyPatch) -> None:
-    from xero_ai_review_gateway import gateway
+    from elizabeth_anne_alexander import gateway
 
     real = gateway._variance_findings
 
@@ -367,8 +367,8 @@ import sys
 from datetime import date
 from decimal import Decimal
 
-from xero_ai_review_gateway.errors import GatewayError
-from xero_ai_review_gateway.gateway import BalanceRow, _variance_findings
+from elizabeth_anne_alexander.errors import GatewayError
+from elizabeth_anne_alexander.gateway import BalanceRow, _variance_findings
 
 
 def row(account_id, section):
@@ -492,7 +492,7 @@ EVIDENCE_ITEM = {
     ],
 )
 def test_malformed_evidence_items_are_blocked(items: list, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from xero_ai_review_gateway.util import canonical_json, sha256_bytes
+    from elizabeth_anne_alexander.util import canonical_json, sha256_bytes
 
     monkeypatch.chdir(tmp_path)
     build = tmp_path / "build"
@@ -537,7 +537,7 @@ def test_unknown_section_is_denied_by_policy(tmp_path: Path) -> None:
     bad = tmp_path / "request.json"
     bad.write_text(json.dumps(request), encoding="utf-8")
 
-    from xero_ai_review_gateway.gateway import _load_policy, _load_request
+    from elizabeth_anne_alexander.gateway import _load_policy, _load_request
 
     policy = _load_policy(PKG / "policy" / "demo-policy-v1.json")
     with pytest.raises(GatewayError, match="not allowlisted"):
@@ -866,7 +866,7 @@ def test_a_decision_file_that_records_no_decision_against_findings_is_refused(
 
 def _clean_run(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[dict[str, Path], dict]:
     """A completed run in tmp_path/build whose evidence carries zero findings."""
-    from xero_ai_review_gateway import gateway
+    from elizabeth_anne_alexander import gateway
 
     monkeypatch.setattr(gateway, "_variance_findings", lambda *args, **kwargs: [])
     monkeypatch.chdir(tmp_path)
@@ -972,7 +972,7 @@ def test_a_truncated_flag_that_contradicts_the_item_counts_is_refused(tmp_path: 
 
 def test_evaluate_refuses_to_emit_a_model_result_carrying_raw_source_data(monkeypatch: pytest.MonkeyPatch) -> None:
     """The disclosure assertion has to run on the production path, not only in its own unit test."""
-    from xero_ai_review_gateway import gateway
+    from elizabeth_anne_alexander import gateway
 
     real = gateway._variance_findings
 
@@ -1050,7 +1050,7 @@ def test_the_readme_states_the_timestamp_grammar_the_gateway_enforces() -> None:
 
 def test_an_interrupted_rerun_leaves_the_previous_run_intact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A half-written pack must not mix one run's model result with another run's receipt."""
-    from xero_ai_review_gateway import gateway
+    from elizabeth_anne_alexander import gateway
 
     monkeypatch.chdir(tmp_path)
     model, evidence, receipt = _evaluate()
@@ -1089,7 +1089,7 @@ def test_a_pack_mixed_by_a_failed_move_is_refused_by_validate_review(tmp_path: P
     and receipt. Those two still agree with each other, so only the receipt's
     result digest can tell that the pack describes two runs.
     """
-    from xero_ai_review_gateway import gateway
+    from elizabeth_anne_alexander import gateway
 
     monkeypatch.chdir(tmp_path)
     model, evidence, receipt = _evaluate()
@@ -1165,7 +1165,7 @@ def test_the_three_artefacts_the_scope_note_exempts_reject_an_added_mode_key(tmp
     disabled all three of these artefacts load and the run completes, so the
     tie-out was pinning prose that nothing policed.
     """
-    from xero_ai_review_gateway.gateway import _load_policy, _load_request
+    from elizabeth_anne_alexander.gateway import _load_policy, _load_request
 
     policy_path = tmp_path / "policy.json"
     policy_source = json.loads((PKG / "policy" / "demo-policy-v1.json").read_text(encoding="utf-8"))
@@ -1208,7 +1208,7 @@ def test_an_absurd_magnitude_is_refused_not_raised_out_of_the_balance_gate() -> 
     """`1E+1000000` parses and is finite, so it reached the arithmetic and the
     first sum raised decimal.Overflow out of the gate. A gateway that exists to
     fail closed has to refuse the file instead."""
-    from xero_ai_review_gateway.gateway import _decimal
+    from elizabeth_anne_alexander.gateway import _decimal
 
     with pytest.raises(GatewayError, match="supported magnitude range"):
         _decimal("1E+1000000", field="YTDDebit")
@@ -1222,7 +1222,7 @@ def test_an_absurd_percentage_is_refused_not_raised_out_of_the_projection() -> N
     """quantize raises InvalidOperation once the result needs more digits than
     the context allows, and that walked out of _percent_string as a bare
     decimal error rather than the fail-closed GatewayError."""
-    from xero_ai_review_gateway.gateway import _percent_string
+    from elizabeth_anne_alexander.gateway import _percent_string
 
     with pytest.raises(GatewayError, match="supported magnitude range"):
         _percent_string(Decimal("1E+30"))
@@ -1233,7 +1233,7 @@ def test_an_absurd_percentage_is_refused_not_raised_out_of_the_projection() -> N
 def test_a_non_iterable_model_projection_is_refused_not_a_type_error(tmp_path: Path) -> None:
     """tuple() on an int raises TypeError, which is not the fail-closed error
     every other malformed-policy path produces."""
-    from xero_ai_review_gateway.gateway import _load_policy
+    from elizabeth_anne_alexander.gateway import _load_policy
 
     source = json.loads((PKG / "policy" / "demo-policy-v1.json").read_text(encoding="utf-8"))
     source["model_projection"] = 9

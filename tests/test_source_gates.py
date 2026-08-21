@@ -18,12 +18,12 @@ from pathlib import Path
 
 import pytest
 
-from xero_ai_review_gateway import gateway
-from xero_ai_review_gateway.errors import GatewayError
-from xero_ai_review_gateway.gateway import _load_context, _load_manifest, _load_policy, _load_request, _load_tb
-from xero_ai_review_gateway.util import canonical_json, sha256_bytes, sha256_file
+from elizabeth_anne_alexander import gateway
+from elizabeth_anne_alexander.errors import GatewayError
+from elizabeth_anne_alexander.gateway import _load_context, _load_manifest, _load_policy, _load_request, _load_tb
+from elizabeth_anne_alexander.util import canonical_json, sha256_bytes, sha256_file
 
-PKG = Path(__file__).resolve().parents[1] / "xero_ai_review_gateway"
+PKG = Path(__file__).resolve().parents[1] / "elizabeth_anne_alexander"
 CURRENT_MANIFEST = "sample-tb-2026-06-30.manifest.json"
 PRIOR_MANIFEST = "sample-tb-2026-05-31.manifest.json"
 CONTEXT = "sample-monthly-variance.context.json"
