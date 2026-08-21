@@ -10,6 +10,7 @@ permissions:
 
 jobs:
   test:
+    timeout-minutes: 15
     permissions:
       contents: read
     strategy:
@@ -32,6 +33,7 @@ jobs:
           UV_PYTHON: ${{ matrix.python }}
 
   package:
+    timeout-minutes: 15
     permissions:
       contents: read
     runs-on: ubuntu-latest

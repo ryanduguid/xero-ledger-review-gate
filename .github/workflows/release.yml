@@ -19,6 +19,7 @@ jobs:
       upload-dist-artifact: true
       version-command: "python -c 'from elizabeth_anne_alexander.version import __version__; print(__version__)'"
   pypi:
+    timeout-minutes: 15
     name: publish to PyPI
     needs: release
     runs-on: ubuntu-latest
