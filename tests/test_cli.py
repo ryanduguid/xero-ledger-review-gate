@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from xero_ai_review_gateway.cli import main
+from elizabeth_anne_alexander.cli import main
 
 EVALUATE = [
     "evaluate",
@@ -16,7 +16,9 @@ EVALUATE = [
 ]
 
 
-def test_cli_end_to_end_from_any_working_directory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_cli_end_to_end_from_any_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     monkeypatch.chdir(tmp_path)
     assert main([
         "evaluate",
@@ -32,6 +34,9 @@ def test_cli_end_to_end_from_any_working_directory(tmp_path: Path, monkeypatch: 
         "--receipt", "build/demo/receipt.json",
         "--decision", "samples/decisions/sample-review-decision.json",
     ]) == 0
+    output = capsys.readouterr()
+    assert output.out.count("elizabeth-anne-alexander:") == 2
+    assert "xero-ai-review-gateway:" not in output.out
 
 
 def test_cli_blocks_output_outside_cwd_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

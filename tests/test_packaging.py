@@ -7,6 +7,35 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 
 
+def test_active_package_identity_is_consistent() -> None:
+    active_surfaces = [
+        REPO / "pyproject.toml",
+        REPO / "MANIFEST.in",
+        REPO / ".gitignore",
+        REPO / ".github" / "workflows" / "ci.yml",
+        REPO / ".github" / "workflows" / "release.yml",
+        REPO / "README.md",
+        REPO / "CONTRIBUTING.md",
+    ]
+    text = "\n".join(path.read_text(encoding="utf-8") for path in active_surfaces)
+
+    assert "ElizabethAnneAlexander" in text
+    assert "elizabeth-anne-alexander" in text
+    assert "elizabeth_anne_alexander" in text
+    assert "xero-ai-review-gateway" not in text
+    assert "xero_ai_review_gateway" not in text
+
+
+def test_release_workflow_keeps_the_pinned_reusable_policy_caller() -> None:
+    workflow = (REPO / ".github" / "workflows" / "release.yml").read_text(encoding="utf-8")
+
+    assert (
+        "uses: ryanduguid/release-policy/.github/workflows/"
+        "release-python.yml@2138799a34e5a3441c9b132113a29f9d9af86109 # v0.1.0"
+    ) in workflow
+    assert "from elizabeth_anne_alexander.version import __version__" in workflow
+
+
 def test_build_artefacts_cannot_be_committed_by_accident() -> None:
     """The README tells the reader to run `python -m build`, which fills dist/."""
     ignore = REPO / ".gitignore"

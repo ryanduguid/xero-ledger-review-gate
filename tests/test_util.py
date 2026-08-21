@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from xero_ai_review_gateway.errors import GatewayError
-from xero_ai_review_gateway.util import load_json_exact, load_json_object, path_within, sha256_file
+from elizabeth_anne_alexander.errors import GatewayError
+from elizabeth_anne_alexander.util import load_json_exact, load_json_object, path_within, sha256_file
 
 
 @pytest.mark.parametrize("payload", ["[]", '"text"', "3"])

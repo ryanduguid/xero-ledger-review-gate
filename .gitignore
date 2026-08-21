@@ -6,7 +6,7 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 *.csv
-!xero_ai_review_gateway/samples/inputs/*.csv
+!elizabeth_anne_alexander/samples/inputs/*.csv
 .env
 .env.*
 *.token

@@ -1,10 +1,18 @@
-# Xero AI Review Gateway
+# ElizabethAnneAlexander
 
-[![tests](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![tests](https://github.com/ryanduguid/ElizabethAnneAlexander/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/ElizabethAnneAlexander/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 
 A **fixed-policy ledger-review boundary for AI**, not an AI that can operate Xero.
 
 The first version consumes fabricated, validated Xero-shaped trial-balance CSVs and produces a bounded, redacted variance-review result plus separate local reviewer evidence. It deliberately has no Xero OAuth, no HTTP/MCP/LLM client, no free-form prompts, and no accounting write operation.
+
+The repository is `ElizabethAnneAlexander`; the Python distribution and command are `elizabeth-anne-alexander`; imports use `elizabeth_anne_alexander`.
+
+## Name
+
+`ElizabethAnneAlexander` is named for [Elizabeth Anne Alexander AO](https://fbe.unimelb.edu.au/centenary/our-stories/profiles/elizabeth-alexander), an Australian accounting and auditing pioneer. She became PwC's first female partner in Australia in 1977 and the first female national president of the Australian Society of Accountants in 1988.
+
+The name is commemorative. This independent open-source project is not affiliated with or endorsed by Elizabeth Anne Alexander, PwC, the University of Melbourne, CPA Australia or Xero.
 
 ```text
 Fabricated validated TB exports
@@ -28,7 +36,7 @@ Human acknowledgement or escalation
 ```bash
 python -m pip install -e ".[dev]"
 
-xero-ai-review-gateway evaluate \
+elizabeth-anne-alexander evaluate \
   --context samples/contexts/sample-monthly-variance.context.json \
   --request samples/requests/sample-revenue-variance.request.json \
   --policy policy/demo-policy-v1.json \
@@ -44,7 +52,7 @@ The command works from any directory: the relative `samples/` and `policy/` path
 The sole supported request is `trial_balance_variance` for an explicitly allowlisted section. It cannot select columns, change thresholds, use a natural-language prompt, choose a file path, or invoke an arbitrary Xero/MCP tool.
 
 ```bash
-xero-ai-review-gateway validate-review \
+elizabeth-anne-alexander validate-review \
   --evidence build/demo/reviewer-evidence.json \
   --receipt build/demo/receipt.json \
   --decision samples/decisions/sample-review-decision.json
