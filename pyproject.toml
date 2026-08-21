@@ -17,7 +17,10 @@ classifiers = [
   "Intended Audience :: Financial and Insurance Industry",
   "Programming Language :: Python :: 3",
 ]
-dependencies = []
+[project.urls]
+Homepage = "https://github.com/ryanduguid/ElizabethAnneAlexander"
+Repository = "https://github.com/ryanduguid/ElizabethAnneAlexander.git"
+Issues = "https://github.com/ryanduguid/ElizabethAnneAlexander/issues"
 
 [tool.setuptools.dynamic]
 version = { attr = "elizabeth_anne_alexander.version.__version__" }

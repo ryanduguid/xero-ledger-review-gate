@@ -1,0 +1,13 @@
+# ElizabethAnneAlexander (elizabeth-anne-alexander)
+> High-density context for AI safety auditors, LLM architects, and security engineers.
+
+## Package Overview
+- **Repository**: https://github.com/ryanduguid/ElizabethAnneAlexander
+- **Package Name**: `elizabeth-anne-alexander`
+- **CLI Command**: `elizabeth-anne-alexander`
+- **Domain**: Fixed-policy, zero-network security perimeter and synthetic data review harness for AI-assisted trial balance review.
+- **Core Principles**: Privacy-by-design, data minimisation, deterministic pre-validation, complete air-gapping of confidential client data.
+
+## Architectural Boundaries
+1. **Zero-Network Invariant**: Prohibits outbound network transmissions, external API calls, or cloud LLM routing during confidential data processing.
+2. **Synthetic Data Sandbox**: Public tests execute strictly against non-client synthetic data schemas.
