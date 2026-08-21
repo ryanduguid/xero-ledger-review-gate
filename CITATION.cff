@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software in research or industry applications, please cite it as below."
+authors:
+  - family-names: Duguid
+    given-names: Ryan
+title: "ElizabethAnneAlexander: Zero-Network Fixed-Policy Ledger-Review Boundary for AI"
+version: 0.1.0
+date-released: 2026-08-22
+url: "https://github.com/ryanduguid/ElizabethAnneAlexander"
+repository-code: "https://github.com/ryanduguid/ElizabethAnneAlexander"
+license: MIT
+keywords:
+  - accounting
+  - trial-balance
+  - privacy-by-design
+  - ai-safety
+  - zero-network
+  - xero

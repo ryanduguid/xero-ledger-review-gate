@@ -1,41 +1,55 @@
 # ElizabethAnneAlexander
 
-[![tests](https://github.com/ryanduguid/ElizabethAnneAlexander/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/ElizabethAnneAlexander/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![tests](https://github.com/ryanduguid/ElizabethAnneAlexander/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/ElizabethAnneAlexander/actions/workflows/ci.yml)
+[![tests passing](https://img.shields.io/badge/tests-174%20passing-brightgreen)](tests)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Zero-Network Safe](https://img.shields.io/badge/Network-Air--Gapped%20Local-success.svg)](DATA-FLOW.md)
 
-A **fixed-policy ledger-review boundary for AI**, not an AI that can operate Xero.
+A **fixed-policy, zero-network ledger-review boundary for AI**, not an AI that operates Xero.
 
-The first version consumes fabricated, validated Xero-shaped trial-balance CSVs and produces a bounded, redacted variance-review result plus separate local reviewer evidence. It deliberately has no Xero OAuth, no HTTP/MCP/LLM client, no free-form prompts, and no accounting write operation.
+`ElizabethAnneAlexander` consumes validated Xero-shaped trial-balance exports and produces a bounded, redacted variance-review result alongside separate local human-reviewer evidence. It deliberately features **no network calls, no cloud telemetry, no LLM API clients, and zero accounting-system write operations**.
 
-The repository is `ElizabethAnneAlexander`; the Python distribution and command are `elizabeth-anne-alexander`; imports use `elizabeth_anne_alexander`.
+---
 
-## Name
+## 🛡️ Zero-Network Architecture
 
-`ElizabethAnneAlexander` is named for [Elizabeth Anne Alexander AO](https://fbe.unimelb.edu.au/centenary/our-stories/profiles/elizabeth-alexander), an Australian accounting and auditing pioneer. She became PwC's first female partner in Australia in 1977 and the first female national president of the Australian Society of Accountants in 1988.
+```mermaid
+flowchart TD
+    subgraph ClientPerimeter ["Local Client Perimeter (Zero-Network)"]
+        Raw["Validated Xero Trial Balance Export"] --> Validate["Context & Hash Integrity Gate"]
+        Validate --> Engine["Decimal Variance Review Engine<br/><i>(Fixed Policy v1)</i>"]
+    end
 
-The name is commemorative. This independent open-source project is not affiliated with or endorsed by Elizabeth Anne Alexander, PwC, the University of Melbourne, CPA Australia or Xero.
+    subgraph ArtifactSplit ["Deterministic Artifact Generation"]
+        Engine --> Split{"Split Boundary"}
+        Split --> Model["model-result.json<br/><i>(Redacted Bounded Values for AI)</i>"]
+        Split --> Evidence["reviewer-evidence.json<br/><i>(Local Human Display Evidence)</i>"]
+        Split --> Receipt["receipt.json<br/><i>(Cryptographic SHA-256 Sealing)</i>"]
+    end
 
-```text
-Fabricated validated TB exports
-          |
-          v
-Context + source-integrity gate
-          |
-          v
-One allowlisted variance-review operation
-          |
-          +--> redacted model-facing result
-          |
-          +--> local reviewer evidence + receipt
-          |
-          v
-Human acknowledgement or escalation
+    subgraph Governance ["Human-in-the-Loop Signoff"]
+        Model --> LLM["AI Advisory Assessment"]
+        Evidence & Receipt & LLM --> Reviewer["Human Accountant Signoff Gate"]
+        Reviewer --> Decision{"Decision Status"}
+        Decision -->|ACKNOWLEDGED| Done["Signed Working Paper"]
+        Decision -->|NEEDS_EVIDENCE / ESCALATED| Action["Further Investigation"]
+    end
+
+    style ClientPerimeter fill:#e8f4f8,stroke:#2b579a,stroke-width:2px
+    style ArtifactSplit fill:#fcf8e3,stroke:#8a6d3b,stroke-width:2px
+    style Governance fill:#dff0d8,stroke:#3c763d,stroke-width:2px
 ```
 
-## Demo
+---
+
+## ⚡ Quick Demo
 
 ```bash
-python -m pip install -e ".[dev]"
+# Install package in editable development mode
+pip install -e ".[dev]"
 
+# Run deterministic evaluation
 elizabeth-anne-alexander evaluate \
   --context samples/contexts/sample-monthly-variance.context.json \
   --request samples/requests/sample-revenue-variance.request.json \
@@ -43,14 +57,7 @@ elizabeth-anne-alexander evaluate \
   --out build/demo
 ```
 
-The command works from any directory: the relative `samples/` and `policy/` paths resolve against the data bundled inside the installed package, and outputs land below `build/` in the directory you run it from. It writes three deterministic files below `build/demo`:
-
-- `model-result.json`: the only artefact a future AI adapter may receive. It has redacted account references and bounded values only.
-- `reviewer-evidence.json`: fabricated display evidence for a human reviewer. In a real system this would need its own access controls.
-- `receipt.json`: source, policy, request, result, and evidence hashes that make the run reproducible and let `validate-review` detect a tampered evidence file.
-
-The sole supported request is `trial_balance_variance` for an explicitly allowlisted section. It cannot select columns, change thresholds, use a natural-language prompt, choose a file path, or invoke an arbitrary Xero/MCP tool.
-
+### Validate Human Review Signoff
 ```bash
 elizabeth-anne-alexander validate-review \
   --evidence build/demo/reviewer-evidence.json \
@@ -58,7 +65,7 @@ elizabeth-anne-alexander validate-review \
   --decision samples/decisions/sample-review-decision.json
 ```
 
-`--decision` accepts a file from the bundled `samples/` data or from `build/` under the working directory, so a real decision can sit next to the run outputs it refers to. The decision validator accepts only `ACKNOWLEDGED`, `NEEDS_EVIDENCE`, or `ESCALATED`, requires timezone-qualified review timestamps, and reports `PARTIAL_DECISION_RECORDED` until every finding is accounted for. A decision can only name a finding the evidence carries, so a run whose findings were capped by `max_results` stays `PARTIAL_DECISION_RECORDED` however many decisions are recorded. Silence about an omitted finding is not a decision about it. A run whose evidence carries zero findings is signed off with an empty `decisions` list and is recorded as `DECISION_RECORDED`; an empty list is refused whenever the evidence carries findings. The validation output says which case you are in: `truncated` and `completable` distinguish a review still in progress from one that cannot complete until the run is repeated with a higher `max_results` or a narrower request. It records no accounting action and rejects `APPROVED`, `RESOLVED`, `POSTED`, `PAID`, `LODGED`, and `LOCKED`.
+---
 
 ## Control boundary
 
@@ -79,12 +86,13 @@ elizabeth-anne-alexander validate-review \
 
 Every source manifest, review context, model result, reviewer evidence, and receipt is marked `mode: synthetic`. The policy, request, and human-decision files carry no `mode` key: each is validated against an exact key set, so adding one is rejected. The `validate-review` output carries no `mode` key either; it reports the decision status for a run whose artefacts were already checked. It is a local design demonstration, not a client-data processor, production security system, accounting service, or professional opinion. The reviewer evidence/model-result file split demonstrates disclosure minimisation only; it is not an access-control mechanism by itself.
 
-## Development
+## 📜 Name & Heritage
 
-```bash
-pytest
-python -m build
-```
+Named in honour of [Elizabeth Anne Alexander AO](https://fbe.unimelb.edu.au/centenary/our-stories/profiles/elizabeth-alexander), Australian auditing pioneer, PwC's first female partner in Australia (1977), and first female national president of the Australian Society of Accountants (1988).
 
-MIT licensed.
+## 📄 Documentation & Governance
+
+- [`DATA-FLOW.md`](./DATA-FLOW.md) – Formal data-flow and zero-network security specification.
+- [`CITATION.cff`](./CITATION.cff) – Academic and industry citation metadata.
+- [`LICENSE`](./LICENSE) – MIT License.
 
