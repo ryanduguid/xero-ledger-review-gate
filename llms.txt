@@ -5,9 +5,10 @@
 - **Repository**: https://github.com/ryanduguid/ElizabethAnneAlexander
 - **Package Name**: `elizabeth-anne-alexander`
 - **CLI Command**: `elizabeth-anne-alexander`
-- **Domain**: Fixed-policy, zero-network security perimeter and synthetic data review harness for AI-assisted trial balance review.
-- **Core Principles**: Privacy-by-design, data minimisation, deterministic pre-validation, complete air-gapping of confidential client data.
+- **Domain**: Local, synthetic-data demonstration of a fixed-policy boundary for AI-assisted trial-balance review.
+- **Core Principles**: Data minimisation, deterministic pre-validation, explicit model-facing and reviewer-only artefacts, and validation of recorded human review decisions.
 
 ## Architectural Boundaries
-1. **Zero-Network Invariant**: Prohibits outbound network transmissions, external API calls, or cloud LLM routing during confidential data processing.
-2. **Synthetic Data Sandbox**: Public tests execute strictly against non-client synthetic data schemas.
+1. **Demonstration Has No Network Client**: The repository contains no OAuth, API, HTTP, MCP, or LLM client, credential store, or accounting-system write path.
+2. **Synthetic Data Only**: Samples, tests, manifests, review context, model results, reviewer evidence, and receipts are synthetic. Real Xero exports, client data, tokens, and workpapers do not belong in this repository.
+3. **Not an Access-Control System**: Separating model-facing and reviewer-only files demonstrates disclosure minimisation; it is not an air gap, multi-user security boundary, client-data processor, or production security system.
