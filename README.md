@@ -1,9 +1,9 @@
 # Elizabeth Anne Alexander
 
 [![tests](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml)
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Zero-Network Safe](https://img.shields.io/badge/Network-Air--Gapped%20Local-success.svg)](DATA-FLOW.md)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-5C2D91.svg?logo=python&logoColor=white&labelColor=04001F)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-4F485E.svg?labelColor=04001F)](LICENSE)
+[![Zero-Network Safe](https://img.shields.io/badge/Network-Air--Gapped%20Local-5C2D91.svg?labelColor=04001F)](DATA-FLOW.md)
 
 A **fixed-policy, zero-network ledger-review boundary for AI**, not an AI that operates Xero.
 
@@ -14,6 +14,7 @@ A **fixed-policy, zero-network ledger-review boundary for AI**, not an AI that o
 ## 🛡️ Zero-Network Architecture
 
 ```mermaid
+%%{init: {"themeVariables": {"lineColor": "#B1AFAD"}}}%%
 flowchart TD
     subgraph ClientPerimeter ["Local Client Perimeter (Zero-Network)"]
         Raw["Validated Xero Trial Balance Export"] --> Validate["Context & Hash Integrity Gate"]
@@ -35,9 +36,9 @@ flowchart TD
         Decision -->|NEEDS_EVIDENCE / ESCALATED| Action["Further Investigation"]
     end
 
-    style ClientPerimeter fill:#e8f4f8,stroke:#2b579a,stroke-width:2px
-    style ArtifactSplit fill:#fcf8e3,stroke:#8a6d3b,stroke-width:2px
-    style Governance fill:#dff0d8,stroke:#3c763d,stroke-width:2px
+    style ClientPerimeter fill:#140E24,stroke:#4F485E,stroke-width:2px,color:#FFFFFF
+    style ArtifactSplit fill:#1E1236,stroke:#5C2D91,stroke-width:2px,color:#FFFFFF
+    style Governance fill:#2D184E,stroke:#8A4AC7,stroke-width:2px,color:#FFFFFF
 ```
 
 ---
@@ -94,4 +95,3 @@ Named in honour of [Elizabeth Anne Alexander AO](https://fbe.unimelb.edu.au/cent
 - [`DATA-FLOW.md`](./DATA-FLOW.md) – Formal data-flow and zero-network security specification.
 - [`CITATION.cff`](./CITATION.cff) – Academic and industry citation metadata.
 - [`LICENSE`](./LICENSE) – MIT License.
-
