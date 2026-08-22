@@ -19,10 +19,10 @@ def test_active_package_identity_is_consistent() -> None:
     ]
     text = "\n".join(path.read_text(encoding="utf-8") for path in active_surfaces)
 
-    assert "ElizabethAnneAlexander" in text
+    assert "xero-ai-review-gateway" in text
     assert "elizabeth-anne-alexander" in text
     assert "elizabeth_anne_alexander" in text
-    assert "xero-ai-review-gateway" not in text
+    assert "ElizabethAnneAlexander" not in text
     assert "xero_ai_review_gateway" not in text
 
 

@@ -18,9 +18,9 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 [project.urls]
-Homepage = "https://github.com/ryanduguid/ElizabethAnneAlexander"
-Repository = "https://github.com/ryanduguid/ElizabethAnneAlexander.git"
-Issues = "https://github.com/ryanduguid/ElizabethAnneAlexander/issues"
+Homepage = "https://github.com/ryanduguid/xero-ai-review-gateway"
+Repository = "https://github.com/ryanduguid/xero-ai-review-gateway.git"
+Issues = "https://github.com/ryanduguid/xero-ai-review-gateway/issues"
 
 [tool.setuptools.dynamic]
 version = { attr = "elizabeth_anne_alexander.version.__version__" }

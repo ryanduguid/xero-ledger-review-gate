@@ -1,8 +1,8 @@
-# ElizabethAnneAlexander (elizabeth-anne-alexander)
+# xero-ai-review-gateway (elizabeth-anne-alexander)
 > High-density context for AI safety auditors, LLM architects, and security engineers.
 
 ## Package Overview
-- **Repository**: https://github.com/ryanduguid/ElizabethAnneAlexander
+- **Repository**: https://github.com/ryanduguid/xero-ai-review-gateway
 - **Package Name**: `elizabeth-anne-alexander`
 - **CLI Command**: `elizabeth-anne-alexander`
 - **Domain**: Local, synthetic-data demonstration of a fixed-policy boundary for AI-assisted trial-balance review.

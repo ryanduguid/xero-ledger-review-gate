@@ -1,7 +1,7 @@
 # Data-Flow & Zero-Network Privacy Guarantee
 
 ## 1. Purpose & Security Model
-`ElizabethAnneAlexander` enforces a zero-network, local-only safety perimeter for reviewing sensitive accounting ledgers and trial balance exports.
+`xero-ai-review-gateway` enforces a zero-network, local-only safety perimeter for reviewing sensitive accounting ledgers and trial balance exports.
 
 ## 2. Zero-Network Guarantee
 - **No Inbound / Outbound Sockets**: The engine contains zero HTTP, socket, or cloud telemetry libraries.
