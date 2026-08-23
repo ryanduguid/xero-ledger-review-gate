@@ -9,7 +9,7 @@ Before tagging:
 3. From an operator session authenticated with repository Administration read access, run:
 
     ```bash
-    gh api -H "X-GitHub-Api-Version: 2026-03-10" repos/ryanduguid/ElizabethAnneAlexander/immutable-releases --jq .enabled
+    gh api -H "X-GitHub-Api-Version: 2026-03-10" repos/ryanduguid/xero-ai-review-gateway/immutable-releases --jq .enabled
     ```
 
     Do not push the tag unless the output is exactly `true`. The Actions `GITHUB_TOKEN` cannot be granted repository Administration read access, so the tag workflow cannot perform this preflight itself.
@@ -21,27 +21,27 @@ The workflow runs the locked tests, builds the wheel and source distribution onc
 Verify the downloaded release with:
 
 ```bash
-gh release download v0.2.0 -R ryanduguid/ElizabethAnneAlexander --dir release-v0.2.0
+gh release download v0.2.0 -R ryanduguid/xero-ai-review-gateway --dir release-v0.2.0
 cd release-v0.2.0
 sha256sum --check SHA256SUMS
-gh attestation verify elizabeth_anne_alexander-0.2.0-py3-none-any.whl -R ryanduguid/ElizabethAnneAlexander
-gh attestation verify elizabeth_anne_alexander-0.2.0-py3-none-any.whl -R ryanduguid/ElizabethAnneAlexander --predicate-type https://spdx.dev/Document/v2.3
-gh release view v0.2.0 -R ryanduguid/ElizabethAnneAlexander --json isImmutable
-gh release verify v0.2.0 -R ryanduguid/ElizabethAnneAlexander
-gh release verify-asset v0.2.0 elizabeth_anne_alexander-0.2.0-py3-none-any.whl -R ryanduguid/ElizabethAnneAlexander
+gh attestation verify elizabeth_anne_alexander-0.2.0-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway
+gh attestation verify elizabeth_anne_alexander-0.2.0-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway --predicate-type https://spdx.dev/Document/v2.3
+gh release view v0.2.0 -R ryanduguid/xero-ai-review-gateway --json isImmutable
+gh release verify v0.2.0 -R ryanduguid/xero-ai-review-gateway
+gh release verify-asset v0.2.0 elizabeth_anne_alexander-0.2.0-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway
 ```
 
 The immutable `v0.1.1` release predates the identity change. Its asset names remain `xero_ai_review_gateway-*`; verify those historical bytes against the renamed repository rather than relabelling them:
 
 ```bash
-gh release download v0.1.1 -R ryanduguid/ElizabethAnneAlexander --dir release-v0.1.1
+gh release download v0.1.1 -R ryanduguid/xero-ai-review-gateway --dir release-v0.1.1
 cd release-v0.1.1
 sha256sum --check SHA256SUMS
-gh attestation verify xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/ElizabethAnneAlexander
-gh attestation verify xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/ElizabethAnneAlexander --predicate-type https://spdx.dev/Document/v2.3
-gh release view v0.1.1 -R ryanduguid/ElizabethAnneAlexander --json isImmutable
-gh release verify v0.1.1 -R ryanduguid/ElizabethAnneAlexander
-gh release verify-asset v0.1.1 xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/ElizabethAnneAlexander
+gh attestation verify xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway
+gh attestation verify xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway --predicate-type https://spdx.dev/Document/v2.3
+gh release view v0.1.1 -R ryanduguid/xero-ai-review-gateway --json isImmutable
+gh release verify v0.1.1 -R ryanduguid/xero-ai-review-gateway
+gh release verify-asset v0.1.1 xero_ai_review_gateway-0.1.1-py3-none-any.whl -R ryanduguid/xero-ai-review-gateway
 ```
 
 If any gate fails, inspect it before touching the tag or draft. Never move a published tag.
