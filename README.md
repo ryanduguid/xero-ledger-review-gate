@@ -1,4 +1,4 @@
-# Elizabeth Anne Alexander
+# xero-ai-review-gateway
 
 [![tests](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-5C2D91.svg?logo=python&logoColor=white&labelColor=04001F)](https://www.python.org/downloads/)
@@ -87,10 +87,6 @@ elizabeth-anne-alexander validate-review \
 ## Scope and limitation
 
 Every source manifest, review context, model result, reviewer evidence, and receipt is marked `mode: synthetic`. The policy, request, and human-decision files carry no `mode` key: each is validated against an exact key set, so adding one is rejected. The `validate-review` output carries no `mode` key either; it reports the decision status for a run whose artefacts were already checked. It is a local design demonstration, not a client-data processor, production security system, accounting service, or professional opinion. The reviewer evidence/model-result file split demonstrates disclosure minimisation only; it is not an access-control mechanism by itself.
-
-## Name & Heritage
-
-Named in honour of [Elizabeth Anne Alexander AO](https://fbe.unimelb.edu.au/centenary/our-stories/profiles/elizabeth-alexander), Australian auditing pioneer, PwC's first female partner in Australia (1977), and first female national president of the Australian Society of Accountants (1988).
 
 ## Documentation & Governance
 
