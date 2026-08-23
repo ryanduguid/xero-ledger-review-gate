@@ -64,14 +64,6 @@ def _review_input_paths(root: Path) -> dict[str, Path]:
     }
 
 
-def _reseal(root: Path, name: str) -> None:
-    """Restate a manifest's declared digest after its CSV was edited."""
-    path = _manifest_path(root, name)
-    manifest = _read(path)
-    manifest["export"]["sha256"] = sha256_file(root / manifest["export"]["csv"])
-    _write(path, manifest)
-
-
 def _redate(root: Path, manifest_name: str, new_date: str) -> None:
     """Move a source's report date, in both the CSV rows and its manifest."""
     path = _manifest_path(root, manifest_name)
