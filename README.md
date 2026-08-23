@@ -11,7 +11,7 @@ A **fixed-policy, zero-network ledger-review boundary for AI**, not an AI that o
 
 ---
 
-## 🛡️ Zero-Network Architecture
+## Zero-Network Architecture
 
 ```mermaid
 %%{init: {"themeVariables": {"lineColor": "#B1AFAD"}}}%%
@@ -43,7 +43,7 @@ flowchart TD
 
 ---
 
-## ⚡ Quick Demo
+## Quick Demo
 
 ```bash
 # Install package in editable development mode
@@ -86,11 +86,11 @@ elizabeth-anne-alexander validate-review \
 
 Every source manifest, review context, model result, reviewer evidence, and receipt is marked `mode: synthetic`. The policy, request, and human-decision files carry no `mode` key: each is validated against an exact key set, so adding one is rejected. The `validate-review` output carries no `mode` key either; it reports the decision status for a run whose artefacts were already checked. It is a local design demonstration, not a client-data processor, production security system, accounting service, or professional opinion. The reviewer evidence/model-result file split demonstrates disclosure minimisation only; it is not an access-control mechanism by itself.
 
-## 📜 Name & Heritage
+## Name & Heritage
 
 Named in honour of [Elizabeth Anne Alexander AO](https://fbe.unimelb.edu.au/centenary/our-stories/profiles/elizabeth-alexander), Australian auditing pioneer, PwC's first female partner in Australia (1977), and first female national president of the Australian Society of Accountants (1988).
 
-## 📄 Documentation & Governance
+## Documentation & Governance
 
 - [`DATA-FLOW.md`](./DATA-FLOW.md) – Formal data-flow and zero-network security specification.
 - [`CITATION.cff`](./CITATION.cff) – Academic and industry citation metadata.
