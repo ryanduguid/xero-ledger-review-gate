@@ -7,6 +7,8 @@
 
 A **fixed-policy, zero-network ledger-review boundary for AI**, not an AI that operates Xero.
 
+The repository name is the public project identity; the `elizabeth-anne-alexander` distribution, import package and command remain compatibility identifiers.
+
 `xero-ai-review-gateway` consumes validated Xero-shaped trial-balance exports and produces a bounded, redacted variance-review result alongside separate local human-reviewer evidence. It deliberately features **no network calls, no cloud telemetry, no LLM API clients, and zero accounting-system write operations**.
 
 ---
