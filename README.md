@@ -1,5 +1,19 @@
 # xero-ai-review-gateway
 
+```
++----------------------------------------------------------------------+
+|                        xero-ai-review-gateway                        |
++----------------------------------------------------------------------+
+|            Fixed policy zero network Xero review gateway             |
++----------------------------------+-----------------------------------+
+| DR  what it gives you            | CR  what it needs                 |
++----------------------------------+-----------------------------------+
+| redacted variance review         | a validated Xero TB export        |
+| local human reviewer evidence    | a review policy JSON file         |
+| zero network fixed policy        | -                                 |
++----------------------------------+-----------------------------------+
+```
+
 [![tests](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/elizabeth-anne-alexander.svg?color=5C2D91&labelColor=04001F)](https://pypi.org/project/elizabeth-anne-alexander/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-5C2D91.svg?logo=python&logoColor=white&labelColor=04001F)](https://www.python.org/downloads/)
