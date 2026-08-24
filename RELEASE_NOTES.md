@@ -1,4 +1,6 @@
-# v0.2.0
+# v0.2.1
+
+The `v0.2.0` tag is retained as an unreleased failed-preflight tag: its release.yml pinned release-policy to a SHA orphaned by a history rewrite, the workflow stopped before publishing, and GitHub's tag-protection rule blocks deleting or moving it.
 
 Changes since `v0.1.1`:
 
