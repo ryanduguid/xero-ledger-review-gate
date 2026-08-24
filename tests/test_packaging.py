@@ -31,9 +31,9 @@ def test_release_workflow_keeps_the_pinned_reusable_policy_caller() -> None:
 
     assert (
         "uses: ryanduguid/release-policy/.github/workflows/"
-        "release-python.yml@1ef826004b2dfa7a886e9415156a48ed675a8ca5"
-        " # release-policy history was rewritten; re-pinned to the equivalent commit"
-        " (emits the built distribution, #7)"
+        "release-python.yml@3b8a377207cab2c7c808fcc96b66578f4695beea"
+        " # release-python.yml's on.workflow_call never re-exposed job outputs;"
+        " caller PyPI publish silently failed until #11"
     ) in workflow
     assert "from elizabeth_anne_alexander.version import __version__" in workflow
 
