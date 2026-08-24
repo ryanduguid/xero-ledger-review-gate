@@ -31,8 +31,9 @@ def test_release_workflow_keeps_the_pinned_reusable_policy_caller() -> None:
 
     assert (
         "uses: ryanduguid/release-policy/.github/workflows/"
-        "release-python.yml@7095ffd2d03e5068bd57c928c306a99626ca46b8"
-        " # post-v0.1.0, adds upload-dist-artifact (#7)"
+        "release-python.yml@1ef826004b2dfa7a886e9415156a48ed675a8ca5"
+        " # release-policy history was rewritten; re-pinned to the equivalent commit"
+        " (emits the built distribution, #7)"
     ) in workflow
     assert "from elizabeth_anne_alexander.version import __version__" in workflow
 
