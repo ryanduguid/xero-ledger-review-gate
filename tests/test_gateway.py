@@ -1050,7 +1050,6 @@ def test_the_readme_states_the_timestamp_grammar_the_gateway_enforces() -> None:
 
 def test_an_interrupted_rerun_leaves_the_previous_run_intact(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A half-written pack must not mix one run's model result with another run's receipt."""
-    from elizabeth_anne_alexander import gateway
 
     monkeypatch.chdir(tmp_path)
     model, evidence, receipt = _evaluate()
@@ -1091,7 +1090,6 @@ def test_a_pack_mixed_by_a_failed_move_is_refused_by_validate_review(tmp_path: P
     and receipt. Those two still agree with each other, so only the receipt's
     result digest can tell that the pack describes two runs.
     """
-    from elizabeth_anne_alexander import gateway
 
     monkeypatch.chdir(tmp_path)
     model, evidence, receipt = _evaluate()
