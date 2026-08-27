@@ -4,8 +4,8 @@ authors:
   - family-names: Duguid
     given-names: Ryan
 title: "Xero Ledger Review Gate: Zero-Network Fixed-Policy Ledger-Review Boundary for AI"
-version: 0.2.0
-date-released: 2026-08-22
+version: 0.2.1
+date-released: 2026-08-24
 url: "https://github.com/ryanduguid/xero-ledger-review-gate"
 repository-code: "https://github.com/ryanduguid/xero-ledger-review-gate"
 license: MIT

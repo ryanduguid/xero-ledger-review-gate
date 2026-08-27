@@ -77,3 +77,15 @@ def test_the_ci_test_step_does_not_repeat_the_quiet_flag_from_addopts() -> None:
         if "-o addopts=" in arguments:
             continue  # the step replaces addopts rather than adding to it
         assert sum(line.count("-q") for line in addopts) + arguments.count("-q") <= 1, step
+
+
+def test_citation_tracks_the_published_compatibility_release() -> None:
+    citation = (REPO / "CITATION.cff").read_text(encoding="utf-8")
+    readme = (REPO / "README.md").read_text(encoding="utf-8")
+
+    assert "\nversion: 0.2.1\n" in citation
+    assert "\ndate-released: 2026-08-24\n" in citation
+    assert (
+        "the `elizabeth-anne-alexander` distribution, import package and command remain "
+        "compatibility identifiers"
+    ) in readme
