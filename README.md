@@ -1,16 +1,24 @@
 # xero-ai-review-gateway
 
+## Scope and assurance boundary
+
+This is a **synthetic-only** design demonstration. It accepts synthetic
+Xero-shaped trial-balance fixtures, not client exports or evidence from Xero.
+`receipt.json` is an adjacent, unkeyed local SHA-256 checksum binding. Anyone
+who can replace the artefacts can replace the receipt. It does not prove
+authorship, source system, origin, time, or immutability.
+
 ```
 +----------------------------------------------------------------------+
 |                        xero-ai-review-gateway                        |
 +----------------------------------------------------------------------+
-|            Fixed policy zero network Xero review gateway             |
+|           Synthetic fixed-policy zero-network review gateway         |
 +----------------------------------+-----------------------------------+
 | DR  what it gives you            | CR  what it needs                 |
 +----------------------------------+-----------------------------------+
-| redacted variance review         | a validated Xero TB export        |
-| local human reviewer evidence    | a review policy JSON file         |
-| zero network fixed policy        | -                                 |
+| redacted variance review         | synthetic Xero-shaped TB fixture  |
+| local review display data        | a review policy JSON file         |
+| local checksum binding           | a human decision JSON file        |
 +----------------------------------+-----------------------------------+
 ```
 
@@ -24,7 +32,7 @@ A **fixed-policy, zero-network ledger-review boundary for AI**, not an AI that o
 
 The repository name is the public project identity; the `elizabeth-anne-alexander` distribution, import package and command remain compatibility identifiers.
 
-`xero-ai-review-gateway` consumes validated Xero-shaped trial-balance exports and produces a bounded, redacted variance-review result alongside separate local human-reviewer evidence. It deliberately features **no network calls, no cloud telemetry, no LLM API clients, and zero accounting-system write operations**.
+`xero-ai-review-gateway` consumes synthetic Xero-shaped trial-balance fixtures and produces a bounded, redacted variance-review result alongside separate local review evidence. It deliberately features **no network calls, no cloud telemetry, no LLM API clients, and zero accounting-system write operations**.
 
 ---
 
@@ -34,22 +42,22 @@ The repository name is the public project identity; the `elizabeth-anne-alexande
 %%{init: {"themeVariables": {"lineColor": "#B1AFAD"}}}%%
 flowchart TD
     subgraph ClientPerimeter ["Local Client Perimeter (Zero-Network)"]
-        Raw["Validated Xero Trial Balance Export"] --> Validate["Context & Hash Integrity Gate"]
+        Raw["Synthetic Xero-Shaped Trial Balance Fixture"] --> Validate["Context & Hash Integrity Gate"]
         Validate --> Engine["Decimal Variance Review Engine<br/><i>(Fixed Policy v1)</i>"]
     end
 
     subgraph ArtifactSplit ["Deterministic Artifact Generation"]
         Engine --> Split{"Split Boundary"}
         Split --> Model["model-result.json<br/><i>(Redacted Bounded Values for AI)</i>"]
-        Split --> Evidence["reviewer-evidence.json<br/><i>(Local Human Display Evidence)</i>"]
-        Split --> Receipt["receipt.json<br/><i>(Cryptographic SHA-256 Sealing)</i>"]
+        Split --> Evidence["reviewer-evidence.json<br/><i>(Local Review Display Data)</i>"]
+        Split --> Receipt["receipt.json<br/><i>(Local SHA-256 Checksum Binding)</i>"]
     end
 
-    subgraph Governance ["Human-in-the-Loop Signoff"]
+    subgraph Governance ["Human-in-the-Loop Review"]
         Model --> LLM["AI Advisory Assessment"]
-        Evidence & Receipt & LLM --> Reviewer["Human Accountant Signoff Gate"]
+        Evidence & Receipt & LLM --> Reviewer["Human Accountant Review Gate"]
         Reviewer --> Decision{"Decision Status"}
-        Decision -->|ACKNOWLEDGED| Done["Signed Working Paper"]
+        Decision -->|ACKNOWLEDGED| Done["Recorded Review Decision"]
         Decision -->|NEEDS_EVIDENCE / ESCALATED| Action["Further Investigation"]
     end
 
@@ -74,7 +82,7 @@ elizabeth-anne-alexander evaluate \
   --out build/demo
 ```
 
-### Validate Human Review Signoff
+### Validate a recorded human review decision
 ```bash
 elizabeth-anne-alexander validate-review \
   --evidence build/demo/reviewer-evidence.json \
@@ -96,7 +104,7 @@ elizabeth-anne-alexander validate-review \
 - An account changing section between periods fails closed instead of disappearing from, or being silently reclassified within, a section-scoped comparison.
 - The model result never contains a tenant name, account name, account code, source file path, token, raw error, or free text copied from source data.
 - Artefact timestamps (`export.generated_at`, `reviewed_at`) are accepted as `YYYY-MM-DD`, then `T`, `t`, or a space, then `HH:MM` with optional `:SS` and optional `.` plus one to six fractional digits, then `Z`, `z`, or `+/-HH:MM` with optional `:SS`. The gateway fixes that grammar itself rather than inheriting `datetime.fromisoformat`, whose accepted forms widened in Python 3.11: a bare `+10` offset, a week date, a basic-format `20260809T000000+0000`, and a fraction longer than six digits are refused on every interpreter, as is a separator character other than `T`, `t`, or a space.
-- The three run artefacts are staged beside their destinations and moved into place only once all three are written, receipt last. The moves are not one atomic step, so an interrupted run can still leave one new file beside two old ones; `validate-review` refuses that pack, because the receipt seals both the reviewer evidence and the model result sitting beside it.
+- The three run artefacts are staged beside their destinations and moved into place only once all three are written, receipt last. The moves are not one atomic step, so an interrupted run can still leave one new file beside two old ones; `validate-review` refuses that pack because the receipt checksum binds the reviewer evidence and model result sitting beside it. This detects mismatched local files, but the adjacent unkeyed receipt provides no independent trust anchor.
 - The package contains no network imports or mutation adapter. A future live connection must remain an authorised, read-only export handoff rather than an AI-controlled broad Xero tool set.
 
 ## Scope and limitation
