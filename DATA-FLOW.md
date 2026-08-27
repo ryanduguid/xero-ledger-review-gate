@@ -2,7 +2,7 @@
 
 ## 1. Purpose and scope
 
-`xero-ai-review-gateway` is a **synthetic-only** local design demonstration for
+Xero Ledger Review Gate is a **synthetic-only** local design demonstration for
 reviewing Xero-shaped trial-balance fixtures. It does not process client exports
 or establish that input came from Xero.
 

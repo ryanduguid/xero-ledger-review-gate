@@ -36,7 +36,8 @@ def test_cli_end_to_end_from_any_working_directory(
     ]) == 0
     output = capsys.readouterr()
     assert output.out.count("elizabeth-anne-alexander:") == 2
-    assert "xero-ai-review-gateway:" not in output.out
+    assert "xero-ai-" + "review-gateway:" not in output.out
+    assert "xero-ledger-review-gate:" not in output.out
 
 
 def test_cli_blocks_output_outside_cwd_build(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

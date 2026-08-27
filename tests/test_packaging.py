@@ -15,15 +15,24 @@ def test_active_package_identity_is_consistent() -> None:
         REPO / ".github" / "workflows" / "ci.yml",
         REPO / ".github" / "workflows" / "release.yml",
         REPO / "README.md",
+        REPO / "CITATION.cff",
+        REPO / "DATA-FLOW.md",
+        REPO / "DISCLAIMER.md",
         REPO / "CONTRIBUTING.md",
+        REPO / "RELEASING.md",
+        REPO / "llms.txt",
     ]
     text = "\n".join(path.read_text(encoding="utf-8") for path in active_surfaces)
+    releasing = (REPO / "RELEASING.md").read_text(encoding="utf-8")
+    runtime_text = text.replace(releasing, "")
 
-    assert "xero-ai-review-gateway" in text
+    assert "xero-ledger-review-gate" in text
+    assert "xero-ai-" + "review-gateway" not in text
     assert "elizabeth-anne-alexander" in text
     assert "elizabeth_anne_alexander" in text
     assert "ElizabethAnneAlexander" not in text
-    assert "xero_ai_review_gateway" not in text
+    assert "xero_ai_review_gateway" not in runtime_text
+    assert "xero_ai_review_gateway-0.1.1" in releasing
 
 
 def test_release_workflow_keeps_the_pinned_reusable_policy_caller() -> None:
