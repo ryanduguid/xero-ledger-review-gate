@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/ryanduguid/xero-trial-balance-export",
+  "commit": "f87b5e4e224b930b3f6d9c9c43e365a9d4ea98d4",
+  "source_root": "evaluation/xero_tb_integrity",
+  "files": {
+    "expected_results.json": "1568687d5ccc809d0267d024b34869061cf10d436a28501e57888314238add91",
+    "fixtures/passing.csv": "2cbe9997a8e7210936ff3c59b5d3fdb0041c1b375b0f9c88cf9ee30d0f356a09",
+    "fixtures/failing_movement.csv": "702175df967b2854e7897cd27fdc4aca441e21b52438381108fabe88ff3153e4",
+    "fixtures/failing_ytd.csv": "ec757f12d13866360fbab189228ebb425893c6f8b299809c6f8567bf5817c64b"
+  }
+}
