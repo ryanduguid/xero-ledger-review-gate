@@ -27,11 +27,12 @@ def test_active_package_identity_is_consistent() -> None:
     runtime_text = text.replace(releasing, "")
 
     assert "xero-ledger-review-gate" in text
-    assert "xero-ai-" + "review-gateway" not in text
+    assert "xero-ai-" + "review-gateway" not in runtime_text
     assert "elizabeth-anne-alexander" in text
     assert "elizabeth_anne_alexander" in text
     assert "ElizabethAnneAlexander" not in text
     assert "xero_ai_review_gateway" not in runtime_text
+    assert "xero-ai-" + "review-gateway" in releasing
     assert "xero_ai_review_gateway-0.1.1" in releasing
 
 
