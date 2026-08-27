@@ -34,3 +34,19 @@ def test_release_tag_validator_rejects_shell_shaped_and_malformed_values() -> No
 
     for tag in ("v0.1.4", "v12.0.103"):
         assert TAG_PATTERN.fullmatch(tag) is not None
+
+
+def test_release_uses_the_hardened_shared_policy_contract() -> None:
+    if not WORKFLOW.is_file():
+        pytest.skip("release workflow is not included in source distributions")
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    release_job = workflow.split("  release:\n", 1)[1].split("\n  pypi:", 1)[0]
+
+    assert (
+        "uses: ryanduguid/release-policy/.github/workflows/release-python.yml@"
+        "8b4de1ed339f1358b5f3e850b63412d8717d01da"
+    ) in release_job
+    assert "actions: read" in release_job
+    assert "version-command:" not in release_job
+    assert "version-parser: python-literal" in release_job
+    assert "version-file: elizabeth_anne_alexander/version.py" in release_job

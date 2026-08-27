@@ -27,13 +27,15 @@ jobs:
   release:
     if: github.event_name == 'push'
     permissions:
+      actions: read # Inspect and download only the exact bound release candidate.
       attestations: write # Record provenance and SBOM attestations for release assets.
       contents: write # Create the draft release, upload assets and publish it.
       id-token: write # Obtain the OIDC identity required to sign attestations.
-    uses: ryanduguid/release-policy/.github/workflows/release-python.yml@3b8a377207cab2c7c808fcc96b66578f4695beea # release-python.yml's on.workflow_call never re-exposed job outputs; caller PyPI publish silently failed until #11
+    uses: ryanduguid/release-policy/.github/workflows/release-python.yml@8b4de1ed339f1358b5f3e850b63412d8717d01da
     with:
       upload-dist-artifact: true
-      version-command: "python -c 'from elizabeth_anne_alexander.version import __version__; print(__version__)'"
+      version-parser: python-literal
+      version-file: elizabeth_anne_alexander/version.py
   pypi:
     if: github.event_name == 'push'
     timeout-minutes: 15
