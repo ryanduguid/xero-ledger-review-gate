@@ -3,11 +3,11 @@ message: "If you use this software in research or industry applications, please 
 authors:
   - family-names: Duguid
     given-names: Ryan
-title: "xero-ai-review-gateway: Zero-Network Fixed-Policy Ledger-Review Boundary for AI"
+title: "Xero Ledger Review Gate: Zero-Network Fixed-Policy Ledger-Review Boundary for AI"
 version: 0.2.0
 date-released: 2026-08-22
-url: "https://github.com/ryanduguid/xero-ai-review-gateway"
-repository-code: "https://github.com/ryanduguid/xero-ai-review-gateway"
+url: "https://github.com/ryanduguid/xero-ledger-review-gate"
+repository-code: "https://github.com/ryanduguid/xero-ledger-review-gate"
 license: MIT
 keywords:
   - accounting

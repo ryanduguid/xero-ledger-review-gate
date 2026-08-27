@@ -18,9 +18,9 @@ classifiers = [
   "Programming Language :: Python :: 3",
 ]
 [project.urls]
-Homepage = "https://github.com/ryanduguid/xero-ai-review-gateway"
-Repository = "https://github.com/ryanduguid/xero-ai-review-gateway.git"
-Issues = "https://github.com/ryanduguid/xero-ai-review-gateway/issues"
+Homepage = "https://github.com/ryanduguid/xero-ledger-review-gate"
+Repository = "https://github.com/ryanduguid/xero-ledger-review-gate.git"
+Issues = "https://github.com/ryanduguid/xero-ledger-review-gate/issues"
 
 [tool.setuptools.dynamic]
 version = { attr = "elizabeth_anne_alexander.version.__version__" }
@@ -65,4 +65,3 @@ python_version = "3.10"
 packages = ["elizabeth_anne_alexander"]
 ignore_missing_imports = true
 pretty = true
-

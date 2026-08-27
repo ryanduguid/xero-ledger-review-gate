@@ -1,6 +1,6 @@
 # Disclaimer
 
-xero-ai-review-gateway is a fixed-policy, zero-network review boundary and test harness for deterministic tax agents. It is not tax, legal, accounting, financial, investment, BAS-agent, registered-tax-agent, or assurance advice. It is not an assessment, a private ruling, or a determination.
+Xero Ledger Review Gate is a fixed-policy, zero-network review boundary and test harness for deterministic tax agents. It is not tax, legal, accounting, financial, investment, BAS-agent, registered-tax-agent, or assurance advice. It is not an assessment, a private ruling, or a determination.
 
 This project is not affiliated with, sponsored by, endorsed by, or approved by:
 
