@@ -1,4 +1,4 @@
-# xero-ai-review-gateway
+# Xero Ledger Review Gate
 
 ## Scope and assurance boundary
 
@@ -10,7 +10,7 @@ authorship, source system, origin, time, or immutability.
 
 ```
 +----------------------------------------------------------------------+
-|                        xero-ai-review-gateway                        |
+|                       Xero Ledger Review Gate                        |
 +----------------------------------------------------------------------+
 |           Synthetic fixed-policy zero-network review gateway         |
 +----------------------------------+-----------------------------------+
@@ -22,7 +22,7 @@ authorship, source system, origin, time, or immutability.
 +----------------------------------+-----------------------------------+
 ```
 
-[![tests](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/xero-ai-review-gateway/actions/workflows/ci.yml)
+[![tests](https://github.com/ryanduguid/xero-ledger-review-gate/actions/workflows/ci.yml/badge.svg)](https://github.com/ryanduguid/xero-ledger-review-gate/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/elizabeth-anne-alexander.svg?color=5C2D91&labelColor=04001F)](https://pypi.org/project/elizabeth-anne-alexander/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-5C2D91.svg?logo=python&logoColor=white&labelColor=04001F)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-4F485E.svg?labelColor=04001F)](LICENSE)
@@ -32,7 +32,7 @@ A **fixed-policy, zero-network ledger-review boundary for AI**, not an AI that o
 
 The repository name is the public project identity; the `elizabeth-anne-alexander` distribution, import package and command remain compatibility identifiers.
 
-`xero-ai-review-gateway` consumes synthetic Xero-shaped trial-balance fixtures and produces a bounded, redacted variance-review result alongside separate local review evidence. It deliberately features **no network calls, no cloud telemetry, no LLM API clients, and zero accounting-system write operations**.
+Xero Ledger Review Gate consumes synthetic Xero-shaped trial-balance fixtures and produces a bounded, redacted variance-review result alongside separate local review evidence. It deliberately features **no network calls, no cloud telemetry, no LLM API clients, and zero accounting-system write operations**.
 
 ---
 
