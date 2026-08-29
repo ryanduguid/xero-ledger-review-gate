@@ -57,6 +57,12 @@ def test_build_artefacts_cannot_be_committed_by_accident() -> None:
     assert {"build/", "dist/"} <= entries
 
 
+def test_sdist_includes_the_vendored_conformance_corpus() -> None:
+    manifest = (REPO / "MANIFEST.in").read_text(encoding="utf-8").splitlines()
+
+    assert "recursive-include tests/conformance/xero_trial_balance_v1 *.csv *.json" in manifest
+
+
 def test_the_ci_test_step_does_not_repeat_the_quiet_flag_from_addopts() -> None:
     """`-q` twice is `-qq`, which drops pytest's summary line from the job log.
 
