@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from importlib.metadata import distribution
 from pathlib import Path
 
 import pytest
+
+from elizabeth_anne_alexander import __version__
+from elizabeth_anne_alexander.cli import main as cli_main
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -80,12 +84,23 @@ def test_the_ci_test_step_does_not_repeat_the_quiet_flag_from_addopts() -> None:
 
 
 def test_citation_tracks_the_published_compatibility_release() -> None:
-    citation = (REPO / "CITATION.cff").read_text(encoding="utf-8")
-    readme = (REPO / "README.md").read_text(encoding="utf-8")
+    citation = {}
+    for line in (REPO / "CITATION.cff").read_text(encoding="utf-8").splitlines():
+        if not line.startswith((" ", "-")) and ": " in line:
+            key, value = line.split(": ", 1)
+            citation[key] = value.strip('"')
 
-    assert "\nversion: 0.2.1\n" in citation
-    assert "\ndate-released: 2026-08-24\n" in citation
-    assert (
-        "the `elizabeth-anne-alexander` distribution, import package and command remain "
-        "compatibility identifiers"
-    ) in readme
+    package = distribution("elizabeth-anne-alexander")
+    console_scripts = [
+        entry_point
+        for entry_point in package.entry_points
+        if entry_point.group == "console_scripts"
+        and entry_point.name == "elizabeth-anne-alexander"
+    ]
+
+    assert package.metadata["Name"] == "elizabeth-anne-alexander"
+    assert package.version == __version__ == citation["version"] == "0.2.1"
+    assert citation["date-released"] == "2026-08-24"
+    assert len(console_scripts) == 1
+    assert console_scripts[0].value == "elizabeth_anne_alexander.cli:main"
+    assert console_scripts[0].load() is cli_main
