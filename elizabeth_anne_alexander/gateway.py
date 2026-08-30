@@ -87,6 +87,15 @@ def _non_empty(value: Any, *, field: str) -> str:
     text = value.strip()
     if any(ord(char) < 32 or ord(char) == 127 for char in text):
         raise GatewayError(f"{field} must not contain control characters.")
+    # A lone surrogate rides a JSON \uD800 escape into an otherwise valid UTF-8
+    # artefact and is not a control character, so it reached the account_ref
+    # digest and raised UnicodeEncodeError out of the run instead of being
+    # refused here. Every value this returns is later encoded, hashed, or
+    # written back out as UTF-8, so the encode is the gate.
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise GatewayError(f"{field} must be encodable as UTF-8 text.") from exc
     return text
 
 
@@ -244,11 +253,12 @@ def _load_manifest(path: Path) -> Source:
         as_at = date.fromisoformat(as_at_text)
     except ValueError as exc:
         raise GatewayError("report.as_at must be an ISO date.") from exc
-    if export["schema"] != "xero-tb-csv.v1" or not isinstance(export["csv"], str) or not isinstance(export["sha256"], str):
-        raise GatewayError("source manifest export schema, csv, or sha256 is invalid.")
+    if export["schema"] != "xero-tb-csv.v1" or not isinstance(export["sha256"], str):
+        raise GatewayError("source manifest export schema or sha256 is invalid.")
+    csv_ref = _non_empty(export["csv"], field="export.csv")
     _iso_timestamp(export["generated_at"], field="export.generated_at")
     root = package_root()
-    csv_path = path_within(root / export["csv"], root / "samples", label="manifest CSV")
+    csv_path = path_within(root / csv_ref, root / "samples", label="manifest CSV")
     csv_snapshot = snapshot_file(csv_path, label="manifest CSV")
     if csv_snapshot.sha256 != export["sha256"].lower():
         raise GatewayError("manifest CSV SHA-256 does not match the supplied source file.")
