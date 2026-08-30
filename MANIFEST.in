@@ -3,3 +3,4 @@ include README.md
 include SECURITY.md
 recursive-include elizabeth_anne_alexander/policy *.json
 recursive-include elizabeth_anne_alexander/samples *.csv *.json
+recursive-include tests/conformance/xero_trial_balance_v1 *.csv *.json
