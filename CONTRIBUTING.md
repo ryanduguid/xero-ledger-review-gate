@@ -12,7 +12,7 @@ If your change widens the model-facing payload, or lets reviewer-only evidence r
 
 ## Data boundary
 
-- Use synthetic data. The `.gitignore` blocks `.csv` outside `elizabeth_anne_alexander/samples/inputs/`, plus `.env`, `.env.*`, `*.token` and `*.pem`.
+- Use synthetic data. The `.gitignore` blocks `.csv` outside `elizabeth_anne_alexander/samples/inputs/` and the three pinned conformance fixtures (`tests/conformance/xero_trial_balance_v1/fixtures/passing.csv`, `failing_movement.csv` and `failing_ytd.csv`), plus `.env`, `.env.*`, `*.token` and `*.pem`.
 - Keep anything drawn from a real Xero organisation out of the repository, including account names, tenant identifiers and balances.
 
 ## Local verification
