@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from importlib.metadata import distribution
 from pathlib import Path
 
 import pytest
+
+from elizabeth_anne_alexander import __version__
+from elizabeth_anne_alexander.cli import main as cli_main
 
 REPO = Path(__file__).resolve().parents[1]
 
@@ -27,11 +31,12 @@ def test_active_package_identity_is_consistent() -> None:
     runtime_text = text.replace(releasing, "")
 
     assert "xero-ledger-review-gate" in text
-    assert "xero-ai-" + "review-gateway" not in text
+    assert "xero-ai-" + "review-gateway" not in runtime_text
     assert "elizabeth-anne-alexander" in text
     assert "elizabeth_anne_alexander" in text
     assert "ElizabethAnneAlexander" not in text
     assert "xero_ai_review_gateway" not in runtime_text
+    assert "xero-ai-" + "review-gateway" in releasing
     assert "xero_ai_review_gateway-0.1.1" in releasing
 
 
@@ -56,6 +61,12 @@ def test_build_artefacts_cannot_be_committed_by_accident() -> None:
     assert {"build/", "dist/"} <= entries
 
 
+def test_sdist_includes_the_vendored_conformance_corpus() -> None:
+    manifest = (REPO / "MANIFEST.in").read_text(encoding="utf-8").splitlines()
+
+    assert "recursive-include tests/conformance/xero_trial_balance_v1 *.csv *.json" in manifest
+
+
 def test_the_ci_test_step_does_not_repeat_the_quiet_flag_from_addopts() -> None:
     """`-q` twice is `-qq`, which drops pytest's summary line from the job log.
 
@@ -76,3 +87,26 @@ def test_the_ci_test_step_does_not_repeat_the_quiet_flag_from_addopts() -> None:
         if "-o addopts=" in arguments:
             continue  # the step replaces addopts rather than adding to it
         assert sum(line.count("-q") for line in addopts) + arguments.count("-q") <= 1, step
+
+
+def test_citation_tracks_the_published_compatibility_release() -> None:
+    citation = {}
+    for line in (REPO / "CITATION.cff").read_text(encoding="utf-8").splitlines():
+        if not line.startswith((" ", "-")) and ": " in line:
+            key, value = line.split(": ", 1)
+            citation[key] = value.strip('"')
+
+    package = distribution("elizabeth-anne-alexander")
+    console_scripts = [
+        entry_point
+        for entry_point in package.entry_points
+        if entry_point.group == "console_scripts"
+        and entry_point.name == "elizabeth-anne-alexander"
+    ]
+
+    assert package.metadata["Name"] == "elizabeth-anne-alexander"
+    assert package.version == __version__ == citation["version"] == "0.2.1"
+    assert citation["date-released"] == "2026-08-24"
+    assert len(console_scripts) == 1
+    assert console_scripts[0].value == "elizabeth_anne_alexander.cli:main"
+    assert console_scripts[0].load() is cli_main

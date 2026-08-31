@@ -123,10 +123,14 @@ def path_within(path: Path, parent: Path, *, label: str, require_exists: bool = 
         resolved = path.resolve(strict=require_exists)
     except FileNotFoundError as exc:
         raise GatewayError(f"{label} does not exist: {path}.") from exc
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         # A name the operating system refuses outright (a reserved character,
         # a too-long path, a file used as a directory component) must stay
         # inside the fail-closed contract rather than escape as a traceback.
+        # ValueError joins OSError because resolve raises it before reaching
+        # the filesystem at all: plain ValueError for an embedded NUL, and
+        # UnicodeEncodeError (a ValueError subclass) for a lone surrogate a
+        # manifest can carry through a JSON \uD800 escape.
         raise GatewayError(f"{label} is not a usable path: {path}.") from exc
     try:
         resolved.relative_to(root)

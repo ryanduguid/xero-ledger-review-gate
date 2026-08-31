@@ -87,6 +87,15 @@ def _non_empty(value: Any, *, field: str) -> str:
     text = value.strip()
     if any(ord(char) < 32 or ord(char) == 127 for char in text):
         raise GatewayError(f"{field} must not contain control characters.")
+    # A lone surrogate rides a JSON \uD800 escape into an otherwise valid UTF-8
+    # artefact and is not a control character, so it reached the account_ref
+    # digest and raised UnicodeEncodeError out of the run instead of being
+    # refused here. Every value this returns is later encoded, hashed, or
+    # written back out as UTF-8, so the encode is the gate.
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise GatewayError(f"{field} must be encodable as UTF-8 text.") from exc
     return text
 
 
