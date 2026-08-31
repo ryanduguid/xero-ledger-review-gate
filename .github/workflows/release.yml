@@ -19,17 +19,23 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.repository }}-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   release:
     if: github.event_name == 'push'
     permissions:
+      actions: read # Inspect and download only the exact bound release candidate.
       attestations: write # Record provenance and SBOM attestations for release assets.
       contents: write # Create the draft release, upload assets and publish it.
       id-token: write # Obtain the OIDC identity required to sign attestations.
-    uses: ryanduguid/release-policy/.github/workflows/release-python.yml@3b8a377207cab2c7c808fcc96b66578f4695beea # release-python.yml's on.workflow_call never re-exposed job outputs; caller PyPI publish silently failed until #11
+    uses: ryanduguid/release-policy/.github/workflows/release-python.yml@8b4de1ed339f1358b5f3e850b63412d8717d01da
     with:
       upload-dist-artifact: true
-      version-command: "python -c 'from elizabeth_anne_alexander.version import __version__; print(__version__)'"
+      version-parser: python-literal
+      version-file: elizabeth_anne_alexander/version.py
   pypi:
     if: github.event_name == 'push'
     timeout-minutes: 15
@@ -78,8 +84,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "tag must match vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
           gh release download "$TAG" \
-            --repo "${{ github.repository }}" \
+            --repo "$GITHUB_REPOSITORY" \
             --dir dist \
             --pattern '*.whl' --pattern '*.tar.gz' --pattern 'SHA256SUMS'
           (cd dist && sha256sum --check --ignore-missing SHA256SUMS)
@@ -95,4 +105,3 @@ jobs:
 
       - name: Publish to PyPI via trusted publishing
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-

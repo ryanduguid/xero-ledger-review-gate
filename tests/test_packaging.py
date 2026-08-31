@@ -45,11 +45,10 @@ def test_release_workflow_keeps_the_pinned_reusable_policy_caller() -> None:
 
     assert (
         "uses: ryanduguid/release-policy/.github/workflows/"
-        "release-python.yml@3b8a377207cab2c7c808fcc96b66578f4695beea"
-        " # release-python.yml's on.workflow_call never re-exposed job outputs;"
-        " caller PyPI publish silently failed until #11"
+        "release-python.yml@8b4de1ed339f1358b5f3e850b63412d8717d01da"
     ) in workflow
-    assert "from elizabeth_anne_alexander.version import __version__" in workflow
+    assert "version-parser: python-literal" in workflow
+    assert "version-file: elizabeth_anne_alexander/version.py" in workflow
 
 
 def test_build_artefacts_cannot_be_committed_by_accident() -> None:
