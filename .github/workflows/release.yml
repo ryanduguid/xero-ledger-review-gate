@@ -74,10 +74,11 @@ jobs:
       - name: Download the existing release's attested assets
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release download "${{ inputs.tag }}" \
+          gh release download "$TAG" \
             --repo "${{ github.repository }}" \
             --dir dist \
             --pattern '*.whl' --pattern '*.tar.gz' --pattern 'SHA256SUMS'

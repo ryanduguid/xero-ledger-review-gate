@@ -396,6 +396,32 @@ def test_only_accrual_aud_trial_balances_are_accepted(tmp_path: Path, monkeypatc
         _load_manifest(path)
 
 
+def test_a_manifest_entity_ref_carrying_a_lone_surrogate_is_blocked_not_a_traceback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A lone surrogate is not a control character, so only the encode gate refuses it.
+
+    JSON's \\uD800 escape carries one into an artefact that is itself valid
+    UTF-8, and it survived every manifest gate to reach the account_ref digest,
+    where encoding entity_ref raised UnicodeEncodeError out of the run rather
+    than blocking it. Both manifests are edited because the context gate
+    refuses a pair whose entity_ref values disagree.
+    """
+    root = _sandbox(tmp_path, monkeypatch)
+    for name in (CURRENT_MANIFEST, PRIOR_MANIFEST):
+        path = _manifest_path(root, name)
+        manifest = _read(path)
+        manifest["entity_ref"] = "sample-entity-\ud800"
+        _write(path, manifest)
+
+    with pytest.raises(GatewayError, match="entity_ref must be encodable as UTF-8 text"):
+        gateway.evaluate(
+            context_path=Path("samples/contexts") / CONTEXT,
+            request_path=Path("samples/requests/sample-revenue-variance.request.json"),
+            policy_path=Path("policy/demo-policy-v1.json"),
+        )
+
+
 # --- context gates ----------------------------------------------------------
 
 
