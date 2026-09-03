@@ -1,5 +1,15 @@
 # Xero Ledger Review Gate
 
+> [!IMPORTANT]
+> **Repository migration: 3 September 2026.** We moved maintained development to
+> [`packages/elizabeth-anne-alexander`](https://github.com/ryanduguid/accounting-review-pipeline/tree/main/packages/elizabeth-anne-alexander)
+> in Accounting Review Pipeline.
+> The first replacement release is [`v0.2.2`](https://github.com/ryanduguid/accounting-review-pipeline/releases/tag/elizabeth-anne-alexander/v0.2.2).
+>
+> Keep this repository's [`v0.2.1`](https://github.com/ryanduguid/xero-ledger-review-gate/releases/tag/v0.2.1)
+> as the rollback release until the fourteen-day observation window closes on
+> 17 September 2026. Open new issues and pull requests in Accounting Review Pipeline.
+
 ## Scope and assurance boundary
 
 This is a **synthetic-only** design demonstration. It accepts synthetic
